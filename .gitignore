@@ -1,0 +1,20 @@
+# OS-generated junk files — ไม่เกี่ยวกับโปรเจกต์เลย ไม่ต้อง track
+.DS_Store
+Thumbs.db
+
+# Editor/IDE local settings
+.vscode/
+.idea/
+
+# ถ้ามี .env หรือไฟล์ credential หลุดเข้ามาในอนาคต ห้าม commit เด็ดขาด
+.env
+.env.*
+*.pem
+*.key
+
+# Claude Code local permission settings — เฉพาะเครื่อง มี path เฉพาะเครื่องอยู่ข้างใน
+.claude/settings.local.json
+
+# Skill installs เฉพาะเครื่อง (symlink ไป .agents/skills) — ไม่ใช่โค้ดของโปรเจกต์
+.claude/skills/
+.agents/
