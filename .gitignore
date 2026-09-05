@@ -18,3 +18,7 @@ Thumbs.db
 # Skill installs เฉพาะเครื่อง (symlink ไป .agents/skills) — ไม่ใช่โค้ดของโปรเจกต์
 .claude/skills/
 .agents/
+
+# QA browser Chrome profile (netsuite-qa-browser skill) — เฉพาะเครื่อง ใหญ่มาก (~100MB) มี
+# session/cookie ข้างในด้วย ห้าม commit เด็ดขาด
+.qa-profiles/

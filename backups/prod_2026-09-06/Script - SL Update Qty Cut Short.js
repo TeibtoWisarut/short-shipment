@@ -326,19 +326,12 @@ function OnRequest(context, request, response) {
 		form.addField({id: 'domestic_export_filter', label: 'Domestic/Export', type: 'select', source: 'customrecord_cseg_dom_exp', container: 'g_filter'}).updateDisplayType(DisplayType.INLINE);
 
 		// ----- Load Reason options
-		// Sorted by internalid ASC purely for a stable, predictable dropdown order (matches the
-		// Plan doc's numbered list). The CS Reason↔Phase compatibility table keys off each Reason's
-		// internalid directly, so this sort is cosmetic only — dropdown order can change freely
-		// without affecting that lookup.
 		var reasonOptions = [];
 		try {
 			var rs = search.create({
 				type: 'customrecord_short_shipment_reason',
 				filters: [['isinactive', 'is', 'F']],
-				columns: [
-					search.createColumn({name: 'internalid', sort: search.Sort.ASC}),
-					search.createColumn({name: 'name'}),
-				],
+				columns: ['internalid', 'name'],
 			}).run().getRange({start: 0, end: 1000});
 			for (var r = 0; r < rs.length; r++) {
 				reasonOptions.push({
@@ -559,9 +552,7 @@ function OnRequest(context, request, response) {
 						if (qs_short === 'T' || qs_short === true || qs_short === 'true') continue;
 						var qsv = planLoads[qsPi].getValue({name: 'custrecord_twms_wavei_qtyshipped', join: 'CUSTRECORD_ITEM_INFO_WAVE_LINE'});
 						if (qsv == null || String(qsv).trim() === '') {
-							// Fallback to Wave Quantity (Warehouse-corrected, Phase A truth) — NOT Qty Confirm
-							// (original plan qty, never updated, was the pre-fix bug source)
-							qsv = planLoads[qsPi].getValue({name: 'custrecord_twms_wavei_wavequantity', join: 'CUSTRECORD_ITEM_INFO_WAVE_LINE'});
+							qsv = planLoads[qsPi].getValue('custrecord_item_info_qty_confirm');
 						}
 						sumQtyShipped += (parseFloat(qsv) || 0);
 					}
@@ -580,7 +571,7 @@ function OnRequest(context, request, response) {
                         <td>${escHtml(itemWeightOfUnit)}</td>
                         <td>${escHtml(itemStdNetWeight)}</td>
                         <td>${escHtml(itemGrossWeight)}</td>
-                        <td>${reasonSelectHtml('item-reason')}<span class="item-reason-phase-warn" style="display:none;color:#c0392b;font-weight:600;margin-left:6px;" title="Reason ที่เลือกไม่ตรงกับ Phase ของ Container ที่เลือกไว้ (ไม่ block การ Submit — ตรวจสอบก่อน)">⚠ Reason/Phase mismatch</span></td>
+                        <td>${reasonSelectHtml('item-reason')}</td>
                         <td>${escHtml(lineId)}</td>
                         <td class="col-sa-id" style="display:none;" data-sa-id="${escHtml(saLineInternalId)}">${escHtml(saLineInternalId)}</td>
                     </tr>`;
@@ -610,8 +601,7 @@ function OnRequest(context, request, response) {
                                 <th>Ref. Transfer Order</th><th class="col-to-line" style="display:none;">Transfer Order Line</th><th class="col-to-id" style="display:none;">Ref. Transfer Order ID</th>
                                 <th>Ref. Wave No.</th><th class="col-wave-line" style="display:none;">Ref. Wave Line</th>
                                 <th>Ref. Item Fulfillment</th>
-                                <th>Wave Qty</th>
-                                <th>Qty Shipped (IF)</th>
+                                <th>Qty Shipped</th>
                                 <th>Unit</th>
                                 <th>Do not Cal Conv</th>
                                 <th>Conv.of Unit (PAL)</th>
@@ -646,11 +636,6 @@ function OnRequest(context, request, response) {
 							var refFulfillTxt = pl.getText({name: 'custrecord_twms_wavei_reffulfillment', join: 'CUSTRECORD_ITEM_INFO_WAVE_LINE'}) || '';
 							if (refFulfillTxt) refFulfillTxt = String(refFulfillTxt).replace(/^Item Fulfillment #/, '').trim();
 							if (!refFulfillTxt) refFulfillTxt = pl.getValue({name: 'custrecord_twms_wavei_reffulfillment', join: 'CUSTRECORD_ITEM_INFO_WAVE_LINE'});
-							// Wave Qty (raw) — Warehouse-corrected target qty, always populated once Wave exists.
-							// Qty Shipped (IF) (raw) — blank until Gen IF (Phase A); the "effective" qty used
-							// downstream (row write-value, zero/non-zero branch decision) is qtyShipped ?? waveQuantity,
-							// computed client-side (CS) from these two raw columns.
-							var waveQuantity = pl.getValue({name: 'custrecord_twms_wavei_wavequantity', join: 'CUSTRECORD_ITEM_INFO_WAVE_LINE'});
 							var qtyShipped = pl.getValue({name: 'custrecord_twms_wavei_qtyshipped', join: 'CUSTRECORD_ITEM_INFO_WAVE_LINE'});
 							var wavUomTxt = pl.getText({name: 'custrecord_twms_wavei_uom', join: 'CUSTRECORD_ITEM_INFO_WAVE_LINE'})
 								|| pl.getValue({name: 'custrecord_twms_wavei_uom', join: 'CUSTRECORD_ITEM_INFO_WAVE_LINE'});
@@ -710,7 +695,7 @@ function OnRequest(context, request, response) {
 							var convInputStyle = 'width:80px;text-align:right;' + roStyle;
 
 							// ===== LEVEL 3: Plan/Load row (deepest, no further nesting) =====
-							html += `<tr class="pl-row" data-said="${escHtml(saId_o)}" data-lineid="${escHtml(lineId)}" data-pl-id="${escHtml(plRecId)}" data-qs="${escHtml(qtyShipped == null ? '' : qtyShipped)}" data-wq="${escHtml(waveQuantity == null ? '' : waveQuantity)}" data-qc="${escHtml(qtyConfirm == null ? '' : qtyConfirm)}" data-inactive="${inactiveFlag ? 'T' : 'F'}" data-short-con="${shortConFlag ? 'T' : 'F'}" data-conv-not-cal-default="${convNotCalFlag ? 'T' : 'F'}" data-con-index="${escHtml(conIndex == null ? '' : conIndex)}" data-con-size="${escHtml(conSize == null ? '' : conSize)}">
+							html += `<tr class="pl-row" data-said="${escHtml(saId_o)}" data-lineid="${escHtml(lineId)}" data-pl-id="${escHtml(plRecId)}" data-qs="${escHtml(qtyShipped == null ? '' : qtyShipped)}" data-qc="${escHtml(qtyConfirm == null ? '' : qtyConfirm)}" data-inactive="${inactiveFlag ? 'T' : 'F'}" data-short-con="${shortConFlag ? 'T' : 'F'}" data-conv-not-cal-default="${convNotCalFlag ? 'T' : 'F'}" data-con-index="${escHtml(conIndex == null ? '' : conIndex)}" data-con-size="${escHtml(conSize == null ? '' : conSize)}">
                                 <td><input type="checkbox" class="pl-sel"></td>
                                 <td>${escHtml(planLoadTxt)}</td><td style="text-align:center;"><input type="checkbox" class="pl-short-con"${shortConFlag ? ' checked' : ''} disabled></td>
                                 <td>${escHtml(conIndex)}</td>
@@ -724,7 +709,6 @@ function OnRequest(context, request, response) {
                                 <td>${escHtml(transOrderTxt)}</td><td class="col-to-line" style="display:none;" data-to-line="${escHtml(toLineVal)}">${escHtml(toLineVal)}</td><td class="col-to-id" style="display:none;" data-to-id="${escHtml(transOrderId)}">${escHtml(transOrderId)}</td>
                                 <td>${escHtml(waveNoTxt)}</td><td class="col-wave-line" style="display:none;" data-wave-line="${escHtml(waveLineVal)}">${escHtml(waveLineVal)}</td>
                                 <td>${escHtml(refFulfillTxt)}</td>
-                                <td>${escHtml(waveQuantity)}</td>
                                 <td>${escHtml(qtyShipped)}</td>
                                 <td>${escHtml(wavUomTxt)}</td><td style="text-align:center;"><input type="checkbox" class="pl-do-not-cal-conv"${convNotCalFlag ? ' checked' : ''} disabled></td>
                                 <td><input type="text" class="pl-conv-pal-if" value="${escHtml(convPalIF)}" style="${convInputStyle}" data-default="${escHtml(convPalIF)}"${roAttr}></td>
@@ -919,8 +903,7 @@ function OnRequest(context, request, response) {
                         <th>Conv.of Unit (Roll)</th>
                         <th>TO #</th>
                         <th>Wave #</th>
-                        <th>Wave Qty</th>
-                        <th>Qty Shipped (IF)</th>
+                        <th>Qty Shipped</th>
                         <th>Unit</th>
                         <th>Do not Cal Conv</th>
                         <th>Conv.of Unit (PAL)</th>
@@ -935,7 +918,7 @@ function OnRequest(context, request, response) {
 							var isInactiveT = (p.inactive === 'Yes' || p.inactive === 'T' || p.inactive === true || p.inactive === 'true');
 							var isShortConT = (p.shortCon === true || p.shortCon === 'T' || p.shortCon === 'true' || p.shortCon === 1);
 							// ===== LEVEL 3: Plan/Load row (deepest, no further nesting) =====
-							html2 += `<tr class="pl-row"${rowStyle} data-said="${escHtml2(it.said)}" data-lineid="${escHtml2(it.saLineId)}" data-plid="${escHtml2(p.planLoadId == null ? '' : p.planLoadId)}" data-selected="${p.selected ? 'T' : 'F'}" data-qs="${escHtml2(p.qtyShipped == null ? '' : p.qtyShipped)}" data-qc="${escHtml2(p.qtyConfirm == null ? '' : p.qtyConfirm)}" data-inactive="${isInactiveT ? 'T' : 'F'}" data-short-con="${isShortConT ? 'T' : 'F'}" data-con-index="${escHtml2(p.conIndex == null ? '' : p.conIndex)}" data-con-size="${escHtml2(p.conSize == null ? '' : p.conSize)}"><td><span class="pl-proc-img" data-plid="${escHtml2(p.planLoadId == null ? '' : p.planLoadId)}">${p.selected ? '⏳' : '—'}</span><span class="pl-proc-state" data-plid="${escHtml2(p.planLoadId == null ? '' : p.planLoadId)}">${p.selected ? 'Idle' : 'Skipped'}</span></td><td style="text-align:center;font-weight:700;color:${p.selected ? '#2e7d32' : '#aaa'};">${selMark}</td><td>${escHtml2(p.planLoad)}</td><td style="text-align:center;"><input type="checkbox" class="pl-short-con"${isShortConT ? ' checked' : ''}${p.selected ? '' : ' disabled'}></td><td>${escHtml2(p.conIndex)}</td><td>${escHtml2(p.conSize)}</td><td>${escHtml2(p.conName1)}</td><td>${escHtml2(p.qtyConfirm)}</td><td>${escHtml2(p.convPal)}</td><td>${escHtml2(p.convRoll)}</td><td>${escHtml2(p.toText)}</td><td>${escHtml2(p.waveNo)}</td><td>${escHtml2(p.waveQty)}</td><td>${escHtml2(p.qtyShipped)}</td><td>${escHtml2(p.uom)}</td><td style="text-align:center;"><input type="checkbox"${p.convNotCal ? ' checked' : ''} disabled></td><td>${escHtml2(p.convPalIF)}</td><td>${escHtml2(p.convRollIF)}</td><td>${escHtml2(p.netWeight)}</td><td>${escHtml2(p.grossWeight)}</td><td>${escHtml2(p.inactive)}</td></tr>`;
+							html2 += `<tr class="pl-row"${rowStyle} data-said="${escHtml2(it.said)}" data-lineid="${escHtml2(it.saLineId)}" data-plid="${escHtml2(p.planLoadId == null ? '' : p.planLoadId)}" data-selected="${p.selected ? 'T' : 'F'}" data-qs="${escHtml2(p.qtyShipped == null ? '' : p.qtyShipped)}" data-qc="${escHtml2(p.qtyConfirm == null ? '' : p.qtyConfirm)}" data-inactive="${isInactiveT ? 'T' : 'F'}" data-short-con="${isShortConT ? 'T' : 'F'}" data-con-index="${escHtml2(p.conIndex == null ? '' : p.conIndex)}" data-con-size="${escHtml2(p.conSize == null ? '' : p.conSize)}"><td><span class="pl-proc-img" data-plid="${escHtml2(p.planLoadId == null ? '' : p.planLoadId)}">${p.selected ? '⏳' : '—'}</span><span class="pl-proc-state" data-plid="${escHtml2(p.planLoadId == null ? '' : p.planLoadId)}">${p.selected ? 'Idle' : 'Skipped'}</span></td><td style="text-align:center;font-weight:700;color:${p.selected ? '#2e7d32' : '#aaa'};">${selMark}</td><td>${escHtml2(p.planLoad)}</td><td style="text-align:center;"><input type="checkbox" class="pl-short-con"${isShortConT ? ' checked' : ''}${p.selected ? '' : ' disabled'}></td><td>${escHtml2(p.conIndex)}</td><td>${escHtml2(p.conSize)}</td><td>${escHtml2(p.conName1)}</td><td>${escHtml2(p.qtyConfirm)}</td><td>${escHtml2(p.convPal)}</td><td>${escHtml2(p.convRoll)}</td><td>${escHtml2(p.toText)}</td><td>${escHtml2(p.waveNo)}</td><td>${escHtml2(p.qtyShipped)}</td><td>${escHtml2(p.uom)}</td><td style="text-align:center;"><input type="checkbox"${p.convNotCal ? ' checked' : ''} disabled></td><td>${escHtml2(p.convPalIF)}</td><td>${escHtml2(p.convRollIF)}</td><td>${escHtml2(p.netWeight)}</td><td>${escHtml2(p.grossWeight)}</td><td>${escHtml2(p.inactive)}</td></tr>`;
 						}
 						html2 += '</tbody></table></td></tr>';
 					}
@@ -996,29 +979,6 @@ function OnRequest(context, request, response) {
 				return true;
 			}
 			return false;
-		}
-
-		// Retry-on-collision helper — the ONLY 2 places in this script that do a full
-		// record.load()+.save() (TO section, IF/IR section) are exposed to NetSuite's
-		// concurrent-edit conflict. Retry up to 3 total attempts (1 + 2 retries), NO delay
-		// between attempts (no server-side sleep API; record.load() itself provides the gap).
-		// Retry ONLY on e.name === 'RCRD_HAS_BEEN_CHANGED' — every other error throws immediately.
-		function withRetryOnCollision(fn) {
-			var attempts = 0;
-			var lastErr = null;
-			while (attempts < 3) {
-				attempts++;
-				try {
-					return fn();
-				} catch (e) {
-					lastErr = e;
-					if (e && e.name === 'RCRD_HAS_BEEN_CHANGED' && attempts < 3) {
-						continue;
-					}
-					throw e;
-				}
-			}
-			throw lastErr;
 		}
 
 		var updated = [];
@@ -1130,125 +1090,48 @@ function OnRequest(context, request, response) {
 					}
 				}
 
-				// ---- Governing rule: effective qty (fallback already resolved client-side as
-				//      qtyShippedIF ?? waveQuantity) = 0 or non-zero decides the branch.
-				//      "Short whole container" (pl.shortCon) is scope-only, and only takes effect
-				//      when the row is already zero (Container-level); a non-zero row is always Qty-level.
-				var effectiveQty = parseFloat(pl.effectiveQty);
-				if (isNaN(effectiveQty)) effectiveQty = 0;
-				var isZero = (effectiveQty === 0);
-				var shortConFlag = (pl.shortCon === true || pl.shortCon === 'true' || pl.shortCon === 'T');
-				var isContainerLevel = isZero && shortConFlag;
-
-				// ---- (pre) Phase check — Phase A = no IF exists yet for this TO. Needed ONLY to
-				//      decide whether the TO line may be closed below (Phase B never touches isclosed).
-				//      Cheap existence-only search; the full IF/IR id list is still looked up later
-				//      for reason-sync (unchanged, existing logic).
-				var phaseAActive = false;
+				// ---- (a) TO line — load + match + save
 				try {
-					var ifExistCount = search.create({
-						type: search.Type.TRANSACTION,
-						filters: [
-							['createdfrom', 'anyof', pl.toId], 'AND',
-							['type', 'anyof', ['ItemShip']], 'AND',
-							['mainline', 'is', 'T'], 'AND',
-							['voided', 'is', 'F'],
-						],
-						columns: [search.createColumn({name: 'internalid'})],
-					}).runPaged({pageSize: 1}).count;
-					phaseAActive = (ifExistCount === 0);
-				} catch (ePhase) {
-					log.error({title: 'Phase check fail', details: 'toId=' + pl.toId + ' :: ' + (ePhase.message || String(ePhase))});
-					phaseAActive = false;  // uncertain → do not touch isclosed
-				}
+					log.audit({title: 'usage: before TO load', details: 'toId=' + pl.toId + ' remaining=' + runtime.getCurrentScript().getRemainingUsage()});
+					var toRec = record.load({type: record.Type.TRANSFER_ORDER, id: pl.toId, isDynamic: false});
 
-				// ---- (a) TO line — load + match + save (retry-on-collision wrapped)
-				try {
-					withRetryOnCollision(function () {
-						log.audit({title: 'usage: before TO load', details: 'toId=' + pl.toId + ' remaining=' + runtime.getCurrentScript().getRemainingUsage()});
-						var toRec = record.load({type: record.Type.TRANSFER_ORDER, id: pl.toId, isDynamic: false});
-
-						var lineIdx = -1;
-						if (pl.planLoadId) {
-							try {
-								lineIdx = toRec.findSublistLineWithValue({
-									sublistId: 'item',
-									fieldId: 'custcol_to_plan_load_line',
-									value: pl.planLoadId,
-								});
-							} catch (e) { /* field may not exist */ }
-							if (lineIdx < 0) {
-								var lcA = toRec.getLineCount({sublistId: 'item'});
-								for (var liA = 0; liA < lcA; liA++) {
-									try {
-										var v = toRec.getSublistValue({sublistId: 'item', fieldId: 'custcol_to_plan_load_line', line: liA});
-										if (v != null && String(v) === String(pl.planLoadId)) { lineIdx = liA; break; }
-									} catch (e) { /* ignore */ }
-								}
-							}
-						}
-						if (lineIdx < 0 && pl.toLineId) {
-							lineIdx = findLineIdx(toRec, 'item', pl.toLineId);
-						}
-
-						if (lineIdx < 0) {
-							failed.push({type: 'TO', id: pl.toId, planLoadId: pl.planLoadId, line: pl.toLineId, msg: 'Line not found (PL ' + pl.planLoadId + ')'});
-							return;
-						}
-
-						var toChanged = false;
-
-						// Qty Old preservation (custcol_shortshipment_qty_old) — stamp ONLY on first
-						// change (currently empty), mirroring the existing SA-line pattern.
+					var lineIdx = -1;
+					if (pl.planLoadId) {
 						try {
-							var existingToOld = toRec.getSublistValue({sublistId: 'item', fieldId: 'custcol_shortshipment_qty_old', line: lineIdx});
-							if (existingToOld == null || String(existingToOld).trim() === '') {
-								var preChangeToQty = toRec.getSublistValue({sublistId: 'item', fieldId: 'quantity', line: lineIdx});
-								if (preChangeToQty != null && String(preChangeToQty).trim() !== '') {
-									toRec.setSublistValue({sublistId: 'item', fieldId: 'custcol_shortshipment_qty_old', line: lineIdx, value: preChangeToQty});
-									toChanged = true;
-								}
-							}
-						} catch (eOldTo) {
-							log.error({title: 'TO qty_old fail', details: 'line=' + lineIdx + ' :: ' + (eOldTo.message || String(eOldTo))});
-						}
-
-						if (setIfDiff(toRec, 'item', 'custcol_shortshipment_reason', lineIdx, reason)) toChanged = true;
-						// Qty-level ONLY: write the new (non-zero) quantity. NetSuite hard-rejects
-						// quantity=0 on a Transfer Order line ("must have a positive count", confirmed
-						// empirically) — for isZero rows the line must be CLOSED instead (below), never
-						// have its quantity touched at all; whatever value is already there becomes moot
-						// once the line is closed.
-						if (!isZero) {
-							if (setIfDiff(toRec, 'item', 'quantity', lineIdx, effectiveQty)) toChanged = true;
-						}
-
-						// Line-level / Container-level (qty=0): close the TO line — Phase A ONLY, and
-						// only if not already closed. Phase B: never touch isclosed (TO already finished
-						// its lifecycle via IF/IR). Heavy Container is NEVER touched here (see ACTION 3).
-						var closedNow = false;
-						if (isZero && phaseAActive) {
-							try {
-								var alreadyClosed = toRec.getSublistValue({sublistId: 'item', fieldId: 'isclosed', line: lineIdx});
-								var isClosedFlag = (alreadyClosed === true || alreadyClosed === 'T' || alreadyClosed === 'true');
-								if (!isClosedFlag) {
-									toRec.setSublistValue({sublistId: 'item', fieldId: 'isclosed', line: lineIdx, value: true});
-									toChanged = true;
-									closedNow = true;
-								}
-							} catch (eClose) {
-								log.error({title: 'TO isclosed fail', details: 'line=' + lineIdx + ' :: ' + (eClose.message || String(eClose))});
+							lineIdx = toRec.findSublistLineWithValue({
+								sublistId: 'item',
+								fieldId: 'custcol_to_plan_load_line',
+								value: pl.planLoadId,
+							});
+						} catch (e) { /* field may not exist */ }
+						if (lineIdx < 0) {
+							var lcA = toRec.getLineCount({sublistId: 'item'});
+							for (var liA = 0; liA < lcA; liA++) {
+								try {
+									var v = toRec.getSublistValue({sublistId: 'item', fieldId: 'custcol_to_plan_load_line', line: liA});
+									if (v != null && String(v) === String(pl.planLoadId)) { lineIdx = liA; break; }
+								} catch (e) { /* ignore */ }
 							}
 						}
+					}
+					if (lineIdx < 0 && pl.toLineId) {
+						lineIdx = findLineIdx(toRec, 'item', pl.toLineId);
+					}
 
-						if (toChanged) {
+					if (lineIdx >= 0) {
+						var changedA = setIfDiff(toRec, 'item', 'custcol_shortshipment_reason', lineIdx, reason);
+						var newQty = parseFloat(pl.qtyShipped) || 0;
+						var changedB = setIfDiff(toRec, 'item', 'quantity', lineIdx, newQty);
+						if (changedA || changedB) {
 							log.audit({title: 'usage: before TO save', details: 'id=' + pl.toId + ' remaining=' + runtime.getCurrentScript().getRemainingUsage()});
 							// TO: keep triggers (business logic relies on them) → standard save
 							toRec.save({ignoreMandatoryFields: true});
-							log.audit({title: 'TO saved', details: 'id=' + pl.toId + ' line=' + lineIdx + ' reason=' + reason + ' qty=' + effectiveQty + ' closed=' + closedNow});
-							updated.push({type: 'TO', id: pl.toId, line: lineIdx, reason: reason, qty: effectiveQty, closed: closedNow});
+							log.audit({title: 'TO saved', details: 'id=' + pl.toId + ' line=' + lineIdx + ' reason=' + reason + ' qty=' + newQty});
+							updated.push({type: 'TO', id: pl.toId, line: lineIdx, reason: reason, qty: newQty});
 						}
-					});
+					} else {
+						failed.push({type: 'TO', id: pl.toId, planLoadId: pl.planLoadId, line: pl.toLineId, msg: 'Line not found (PL ' + pl.planLoadId + ')'});
+					}
 				} catch (e) {
 					log.error({title: 'TO load/update fail', details: 'id=' + pl.toId + ' :: ' + (e.message || String(e))});
 					failed.push({type: 'TO', id: pl.toId, planLoadId: pl.planLoadId, msg: e.message || String(e)});
@@ -1257,51 +1140,25 @@ function OnRequest(context, request, response) {
 				// ---- (a-2) Plan/Load record — submitFields (fast)
 				if (pl.planLoadId) {
 					try {
-						var newShortCon = shortConFlag;
+						var newQtyPL = parseFloat(pl.qtyShipped) || 0;
+						var newShortCon = (pl.shortCon === true || pl.shortCon === 'true' || pl.shortCon === 'T');
 						var plValues = {
+							custrecord_item_info_qty_confirm: newQtyPL,
 							custrecord_pl_shortshipment_reason: reason,
 							custrecord_item_info_short_con: newShortCon,
-							// custrecord_item_info_qty_confirm: NEVER written — original plan qty must
-							// survive forever (Wave regeneration on Cancel Wave + Confirm relies on it).
 						};
 						var plNwNum = parseFloat(pl.netWeight);
 						var plGwNum = parseFloat(pl.grossWeight);
 						if (!isNaN(plNwNum)) plValues.custrecord_item_info_net_weight = plNwNum;
 						if (!isNaN(plGwNum)) plValues.custrecord_item_info_gross_weight = plGwNum;
-
-						// Qty Old preservation (custrecord_item_info_short_qty_old) — stamp ONLY on first
-						// change, mirroring custcol_shortshipment_qty_old: preserve the original
-						// (never-overwritten) planned quantity as the pre-short baseline.
-						try {
-							var plLookup = search.lookupFields({
-								type: 'customrecord_exp_item_information_pl',
-								id: pl.planLoadId,
-								columns: ['custrecord_item_info_short_qty_old', 'custrecord_item_info_qty_confirm'],
-							});
-							var existingPlOld = plLookup.custrecord_item_info_short_qty_old;
-							if (existingPlOld == null || String(existingPlOld).trim() === '') {
-								var origQtyConfirm = plLookup.custrecord_item_info_qty_confirm;
-								if (origQtyConfirm != null && String(origQtyConfirm).trim() !== '') {
-									plValues.custrecord_item_info_short_qty_old = parseFloat(origQtyConfirm);
-								}
-							}
-						} catch (eOldPl) {
-							log.error({title: 'PL short_qty_old lookup fail', details: 'id=' + pl.planLoadId + ' :: ' + (eOldPl.message || String(eOldPl))});
-						}
-
-						// Line-level / Container-level (qty=0): inactivate this Detail row.
-						if (isZero) {
-							plValues.isinactive = true;
-						}
-
 						record.submitFields({
 							type: 'customrecord_exp_item_information_pl',
 							id: pl.planLoadId,
 							values: plValues,
 							options: {enableSourcing: false, ignoreMandatoryFields: true},
 						});
-						log.audit({title: 'PlanLoad saved', details: 'id=' + pl.planLoadId + ' reason=' + reason + ' shortCon=' + newShortCon + ' isZero=' + isZero + ' nw=' + plValues.custrecord_item_info_net_weight + ' gw=' + plValues.custrecord_item_info_gross_weight});
-						updated.push({type: 'PlanLoad', id: pl.planLoadId, reason: reason, shortCon: newShortCon, inactive: !!plValues.isinactive, netWeight: plValues.custrecord_item_info_net_weight, grossWeight: plValues.custrecord_item_info_gross_weight});
+						log.audit({title: 'PlanLoad saved', details: 'id=' + pl.planLoadId + ' qty=' + newQtyPL + ' reason=' + reason + ' shortCon=' + newShortCon + ' nw=' + plValues.custrecord_item_info_net_weight + ' gw=' + plValues.custrecord_item_info_gross_weight});
+						updated.push({type: 'PlanLoad', id: pl.planLoadId, qty: newQtyPL, reason: reason, shortCon: newShortCon, netWeight: plValues.custrecord_item_info_net_weight, grossWeight: plValues.custrecord_item_info_gross_weight});
 					} catch (e) {
 						log.error({title: 'PlanLoad submitFields fail', details: 'id=' + pl.planLoadId + ' :: ' + (e.message || String(e))});
 						failed.push({type: 'PlanLoad', id: pl.planLoadId, msg: e.message || String(e)});
@@ -1362,46 +1219,44 @@ function OnRequest(context, request, response) {
 						var trxId = trxList[tx].id;
 						var label = (trxType === record.Type.ITEM_FULFILLMENT ? 'IF' : 'IR');
 						try {
-							withRetryOnCollision(function () {
-								log.audit({title: 'usage: before ' + label + ' load', details: 'id=' + trxId + ' remaining=' + runtime.getCurrentScript().getRemainingUsage()});
-								var trxRec = record.load({type: trxType, id: trxId});
-								var lineCount = trxRec.getLineCount({sublistId: 'item'});
-								var didChange = false;
-								var matchedLines = [];
+							log.audit({title: 'usage: before ' + label + ' load', details: 'id=' + trxId + ' remaining=' + runtime.getCurrentScript().getRemainingUsage()});
+							var trxRec = record.load({type: trxType, id: trxId});
+							var lineCount = trxRec.getLineCount({sublistId: 'item'});
+							var didChange = false;
+							var matchedLines = [];
 
-								for (var li = 0; li < lineCount; li++) {
-									var matched = false;
+							for (var li = 0; li < lineCount; li++) {
+								var matched = false;
 
-									if (pl.planLoadId) {
+								if (pl.planLoadId) {
+									try {
+										var plv = trxRec.getSublistValue({sublistId: 'item', fieldId: 'custcol_to_plan_load_line', line: li});
+										if (plv != null && String(plv) === String(pl.planLoadId)) matched = true;
+									} catch (ee) { /* field may not exist */ }
+								}
+								if (!matched && pl.toLineId) {
+									var srcFields = ['orderline', 'createdfromline', 'transferorderline'];
+									for (var sf = 0; sf < srcFields.length; sf++) {
 										try {
-											var plv = trxRec.getSublistValue({sublistId: 'item', fieldId: 'custcol_to_plan_load_line', line: li});
-											if (plv != null && String(plv) === String(pl.planLoadId)) matched = true;
-										} catch (ee) { /* field may not exist */ }
-									}
-									if (!matched && pl.toLineId) {
-										var srcFields = ['orderline', 'createdfromline', 'transferorderline'];
-										for (var sf = 0; sf < srcFields.length; sf++) {
-											try {
-												var vvv = trxRec.getSublistValue({sublistId: 'item', fieldId: srcFields[sf], line: li});
-												if (vvv != null && String(vvv) === String(pl.toLineId)) { matched = true; break; }
-											} catch (ee2) { /* ignore */ }
-										}
-									}
-
-									if (matched) {
-										matchedLines.push(li);
-										if (setIfDiff(trxRec, 'item', 'custcol_shortshipment_reason', li, reason)) didChange = true;
+											var vvv = trxRec.getSublistValue({sublistId: 'item', fieldId: srcFields[sf], line: li});
+											if (vvv != null && String(vvv) === String(pl.toLineId)) { matched = true; break; }
+										} catch (ee2) { /* ignore */ }
 									}
 								}
 
-								if (didChange) {
-									log.audit({title: 'usage: before ' + label + ' save', details: 'id=' + trxId + ' remaining=' + runtime.getCurrentScript().getRemainingUsage()});
-									// IF/IR: triggers can be skipped → faster save
-									trxRec.save({ignoreMandatoryFields: true, disableTriggers: true});
-									log.audit({title: label + ' saved', details: 'id=' + trxId + ' lines=' + matchedLines.join(',') + ' reason=' + reason});
-									updated.push({type: label, id: trxId, lines: matchedLines, reason: reason});
+								if (matched) {
+									matchedLines.push(li);
+									if (setIfDiff(trxRec, 'item', 'custcol_shortshipment_reason', li, reason)) didChange = true;
 								}
-							});
+							}
+
+							if (didChange) {
+								log.audit({title: 'usage: before ' + label + ' save', details: 'id=' + trxId + ' remaining=' + runtime.getCurrentScript().getRemainingUsage()});
+								// IF/IR: triggers can be skipped → faster save
+								trxRec.save({ignoreMandatoryFields: true, disableTriggers: true});
+								log.audit({title: label + ' saved', details: 'id=' + trxId + ' lines=' + matchedLines.join(',') + ' reason=' + reason});
+								updated.push({type: label, id: trxId, lines: matchedLines, reason: reason});
+							}
 						} catch (e) {
 							log.error({title: label + ' load/save fail', details: 'id=' + trxId + ' :: ' + (e.message || String(e))});
 							failed.push({type: label, id: trxId, msg: e.message || String(e)});
@@ -1426,74 +1281,6 @@ function OnRequest(context, request, response) {
 					ok: failed.length === 0,
 					said: said,
 					planLoadId: pl.planLoadId,
-					updated: updated,
-					failed: failed,
-				}));
-				return;
-			}
-
-			// ============================================================
-			// ====== ACTION 3: close_heavy_container — set isinactive=true on the Heavy Container
-			//        row(s) matched by Container Index. Called ONCE per container by the client,
-			//        ONLY after confirming every Plan Load Item Detail row sharing that container
-			//        index succeeded in process_pl (Reliability fix — Heavy Container is NEVER set
-			//        inside the per-row process_pl loop; if any row failed, this action is skipped
-			//        client-side entirely for that container this run).
-			// ============================================================
-			if (action === 'close_heavy_container') {
-				var conIndex = params.conIndex;
-				try {
-					if (conIndex == null || String(conIndex).trim() === '') {
-						response.setHeader({name: 'Content-Type', value: 'application/json'});
-						response.write(JSON.stringify({ok: false, said: said, msg: 'Missing conIndex'}));
-						return;
-					}
-
-					// custrecord_hc_container_index is only a per-SA sequence number (e.g. "2" for
-					// "container #2 of this shipment") — it repeats across unrelated SAs (confirmed:
-					// 338 rows share index "2" system-wide). MUST also filter by custrecord_hc_ref_sa
-					// (the SA this Heavy Container row belongs to) or this can inactivate a completely
-					// unrelated shipment's Heavy Container row. (Real incident 2026-09-06: without this
-					// filter, 10 unrelated rows got wrongly inactivated in one call — reverted by hand.)
-					var hcResults = search.create({
-						type: 'customrecord_heavy_container',
-						filters: [
-							['custrecord_hc_container_index', 'is', conIndex], 'AND',
-							['custrecord_hc_ref_sa', 'anyof', said],
-						],
-						columns: [search.createColumn({name: 'internalid'})],
-					}).run().getRange({start: 0, end: 10});
-
-					if (hcResults.length === 0) {
-						failed.push({type: 'HeavyContainer', conIndex: conIndex, msg: 'No Heavy Container row found for this Container Index'});
-					} else {
-						for (var hci = 0; hci < hcResults.length; hci++) {
-							var hcId = hcResults[hci].getValue('internalid');
-							try {
-								record.submitFields({
-									type: 'customrecord_heavy_container',
-									id: hcId,
-									values: {isinactive: true},
-									options: {enableSourcing: false, ignoreMandatoryFields: true},
-								});
-								log.audit({title: 'HeavyContainer inactivated', details: 'id=' + hcId + ' conIndex=' + conIndex});
-								updated.push({type: 'HeavyContainer', id: hcId, conIndex: conIndex});
-							} catch (eHc) {
-								log.error({title: 'HeavyContainer submitFields fail', details: 'id=' + hcId + ' :: ' + (eHc.message || String(eHc))});
-								failed.push({type: 'HeavyContainer', id: hcId, conIndex: conIndex, msg: eHc.message || String(eHc)});
-							}
-						}
-					}
-				} catch (e) {
-					log.error({title: 'close_heavy_container fail', details: 'conIndex=' + conIndex + ' :: ' + (e.message || String(e))});
-					failed.push({type: 'HeavyContainer', conIndex: conIndex, msg: e.message || String(e)});
-				}
-
-				response.setHeader({name: 'Content-Type', value: 'application/json'});
-				response.write(JSON.stringify({
-					ok: failed.length === 0,
-					said: said,
-					conIndex: conIndex,
 					updated: updated,
 					failed: failed,
 				}));

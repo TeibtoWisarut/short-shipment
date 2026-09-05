@@ -161,50 +161,6 @@ function PageInit(scriptContext, currentRecord, mode) {
 			setConvInputsEditable($plRow, this.checked);
 		});
 
-		// Recalculate Net/Gross Weight (Level 3) from the item's Weight of Unit conversion, live in
-		// the browser — mirrors the server-side formula: conv (matching Weight of Unit) × item weight
-		// (Level 2, read from the item-row's data-* attrs). Runs regardless of "Do not Cal Conv" state;
-		// only applies when Weight of Unit is Pallet or Roll.
-		function recalcWeightFromConv($plRow) {
-			var said = $plRow.attr('data-said');
-			var lineid = $plRow.attr('data-lineid');
-			var $itemRow = jQuery('tr.item-row[data-said="' + said + '"][data-lineid="' + lineid + '"]');
-			var weightOfUnit = $itemRow.attr('data-weight-of-unit') || '';
-			if (weightOfUnit !== 'Pallet' && weightOfUnit !== 'Roll') return;
-
-			var convVal = (weightOfUnit === 'Pallet')
-				? $plRow.find('.pl-conv-pal-if').val()
-				: $plRow.find('.pl-conv-roll-if').val();
-			var conv = parseFloat(convVal);
-
-            // console.log({ convVal });
-
-			if (isNaN(conv)) return;
-
-			var stdNetWeight = parseFloat($itemRow.attr('data-std-net-weight'));
-			var grossWeightPerUnit = parseFloat($itemRow.attr('data-gross-weight'));
-            // console.log({
-            //     said: said,
-            //     lineid: lineid,
-            //     weightOfUnit: weightOfUnit,
-            //     convVal: convVal,
-            //     conv: conv,
-            //     stdNetWeight: stdNetWeight,
-            //     grossWeightPerUnit: grossWeightPerUnit
-
-            // })
-			if (!isNaN(stdNetWeight)) {
-				$plRow.find('.pl-net-weight').val(parseFloat((conv * stdNetWeight).toFixed(0)));
-			}
-			if (!isNaN(grossWeightPerUnit)) {
-				$plRow.find('.pl-gross-weight').val(parseFloat((conv * grossWeightPerUnit).toFixed(0)));
-			}
-		}
-		jQuery(document).off('change.shortorder-weightcalc', '.pl-conv-pal-if, .pl-conv-roll-if').on('change.shortorder-weightcalc', '.pl-conv-pal-if, .pl-conv-roll-if', function () {
-            console.log('[weightcalc] change fired — new value=' + jQuery(this).val());
-			recalcWeightFromConv(jQuery(this).closest('tr.pl-row'));
-		});
-
 		jQuery(document).off('change.shortorder-pl', '.pl-sel').on('change.shortorder-pl', '.pl-sel', function () {
 			var $plRow = jQuery(this).closest('tr.pl-row');
 			var said = $plRow.attr('data-said');
@@ -258,13 +214,20 @@ function PageInit(scriptContext, currentRecord, mode) {
 			}
 		});
 
-		// ----- Shared recalculation helpers (used by the "Short whole container" cascade below) -----
-		// Item-row Qty Shipped (sum of pls under same item), excludes pl-rows where
-		// short_con is checked OR inactive='T'.
-		function recalcItemQtyShipped($itemRow) {
-			var said = $itemRow.attr('data-said');
-			var lineid = $itemRow.attr('data-lineid');
+		// Short whole container checkbox change → recalculate:
+		//   1. "Qty Shipped" sum on parent item-row
+		//   2. "Total Container" + "Total Container (Text)" on parent sa-row
+		// (excludes pl-rows where short_con is checked OR inactive='T')
+		jQuery(document).off('change.shortcon', '.pl-short-con').on('change.shortcon', '.pl-short-con', function () {
+			var $plRow = jQuery(this).closest('tr.pl-row');
+			var said = $plRow.attr('data-said');
+			var lineid = $plRow.attr('data-lineid');
+			console.log('[shortcon] change fired — said=' + said + ' lineid=' + lineid + ' checked=' + this.checked);
+
+			// ----- (1) Item-row Qty Shipped (sum of pls under same item) -----
+			var $itemRow = jQuery('tr.item-row[data-said="' + said + '"][data-lineid="' + lineid + '"]');
 			var $itemPls = jQuery('tr.item-children[data-said="' + said + '"][data-lineid="' + lineid + '"] tr.pl-row');
+			console.log('[shortcon] item-row found=' + $itemRow.length + ', item pls count=' + $itemPls.length);
 			var sum = 0;
 			$itemPls.each(function () {
 				var $pl = jQuery(this);
@@ -273,22 +236,23 @@ function PageInit(scriptContext, currentRecord, mode) {
 				var qsRaw = $pl.attr('data-qs');
 				var qsv = parseFloat(qsRaw);
 				if (isNaN(qsv) || qsRaw == null || String(qsRaw).trim() === '') {
-					// Fallback to Wave Quantity (Warehouse-corrected, Phase A truth) — NOT Qty Confirm
-					qsv = parseFloat($pl.attr('data-wq')) || 0;
+					qsv = parseFloat($pl.attr('data-qc')) || 0;
 				}
 				sum += qsv;
 			});
 			// Smart 3-decimal: integer → bare; decimal → fix to 3 (keep trailing zeros)
 			sum = parseFloat(sum.toFixed(3));
 			var sumDisp = (sum === Math.floor(sum)) ? String(sum) : sum.toFixed(3);
-			$itemRow.find('.item-qty-shipped').text(sumDisp);
-		}
+			var $itemQsCell = $itemRow.find('.item-qty-shipped');
+			console.log('[shortcon] item-qty-shipped cell found=' + $itemQsCell.length + ', new sum=' + sumDisp);
+			$itemQsCell.text(sumDisp);
 
-		// SA-row Total Container + Total Container (Text) — aggregate across ALL pls under ALL
-		// items of this SA, excludes pl-rows where short_con is checked OR inactive='T'.
-		function recalcSaContainerTotals($saRow) {
-			var said = $saRow.attr('data-said');
+			// ----- (2) SA-row Total Container + Total Container (Text) -----
+			// Aggregate across ALL pls under ALL items of this SA
+			var $saRow = jQuery('tr.sa-row[data-said="' + said + '"]');
 			var $saAllPls = jQuery('tr.item-children[data-said="' + said + '"] tr.pl-row');
+			console.log('[shortcon] sa-row found=' + $saRow.length + ', SA all pls count=' + $saAllPls.length);
+
 			var containerSet = {};
 			var containerBySize = {};
 			$saAllPls.each(function () {
@@ -317,51 +281,15 @@ function PageInit(scriptContext, currentRecord, mode) {
 			var breakdownText = breakdownTextParts.join(', ');
 			var breakdownJson = JSON.stringify(breakdownArr);
 
-			$saRow.find('.sa-total-container').text(totalCont);
+			var $tcCell = $saRow.find('.sa-total-container');
 			var $tctCell = $saRow.find('.sa-total-container-text');
+			console.log('[shortcon] sa-total-container cell found=' + $tcCell.length + ', sa-total-container-text cell found=' + $tctCell.length);
+			console.log('[shortcon] new totalCont=' + totalCont + ', breakdown=' + breakdownText);
+			$tcCell.text(totalCont);
 			$tctCell.text(breakdownText);
 			// Refresh data attribute used by SaveRecord/Submit so AJAX payload picks up the new breakdown
 			$saRow.attr('data-container-breakdown', breakdownJson);
 			$tctCell.attr('data-container-breakdown', breakdownJson);
-		}
-
-		// Short whole container checkbox change → recalculate Qty Shipped / Total Container, AND
-		// (per redesign) cascade the SAME checkbox to every OTHER pl-row sharing this Container
-		// Index (can cross Item branches under the same SA) — auto-select + auto-tick them too.
-		// Cascade is ONE-WAY: tick → tick all siblings; untick → untick only this row (no cascade down).
-		jQuery(document).off('change.shortcon', '.pl-short-con').on('change.shortcon', '.pl-short-con', function () {
-			var $plRow = jQuery(this).closest('tr.pl-row');
-			var said = $plRow.attr('data-said');
-			var lineid = $plRow.attr('data-lineid');
-			var conIndex = ($plRow.attr('data-con-index') || '').trim();
-			var isChecked = this.checked;
-			console.log('[shortcon] change fired — said=' + said + ' lineid=' + lineid + ' conIndex=' + conIndex + ' checked=' + isChecked);
-
-			if (isChecked && conIndex) {
-				var $siblings = jQuery('tr.pl-row[data-said="' + said + '"][data-con-index="' + conIndex + '"]').not($plRow);
-				$siblings.each(function () {
-					var $sib = jQuery(this);
-					var $sibSel = $sib.find('.pl-sel');
-					if (!$sibSel.is(':checked')) {
-						$sibSel.prop('checked', true);
-						// Mirror the .pl-sel handler's up-cascade (tick Item + SA) — done directly
-						// (not via .trigger('change')) to avoid re-entering this same handler.
-						var sLineid = $sib.attr('data-lineid');
-						jQuery('tr.item-row[data-said="' + said + '"][data-lineid="' + sLineid + '"] .item-sel').prop('checked', true);
-						jQuery('tr.sa-row[data-said="' + said + '"] .sa-sel').prop('checked', true);
-					}
-					$sib.find('.pl-short-con').prop('disabled', false).prop('checked', true);
-					// Mirror the .pl-sel handler's "selected → enable Do not Cal Conv" step — setting
-					// .pl-sel via .prop() above does not fire its change handler, so without this the
-					// checkbox stays disabled on every auto-selected sibling (only the row the user
-					// actually clicked gets it enabled by the real click's change event).
-					$sib.find('.pl-do-not-cal-conv').prop('disabled', false);
-				});
-			}
-
-			// Recompute Qty Shipped for every item-row of this SA (a cascade can span items) + SA totals
-			jQuery('tr.item-row[data-said="' + said + '"]').each(function () { recalcItemQtyShipped(jQuery(this)); });
-			recalcSaContainerTotals(jQuery('tr.sa-row[data-said="' + said + '"]'));
 		});
 
 		// SA Reason change → propagate to checked items in that SA (only if item Reason is empty)
@@ -377,45 +305,6 @@ function PageInit(scriptContext, currentRecord, mode) {
 					if (!$itemReason.val()) $itemReason.val(newVal);
 				}
 			});
-		});
-
-		// ----- Reason ↔ Phase compatibility (soft warning only, never blocks Save/Start Process) -----
-		// Static table per Plan doc section 3 (customrecord_short_shipment_reason — 9 fixed reasons,
-		// keyed directly by the Reason record's internalid, id 1-9, verified to match the Plan doc's
-		// numbered list order): reasons id 1-4 = Phase A only, id 5-9 = Phase B only.
-		// Keyed by internalid (not by dropdown sort-rank) so this stays correct even if a reason is
-		// later deactivated or a new one inserted and the dropdown's option order shifts.
-		var REASON_ID_PHASE = {1: 'A', 2: 'A', 3: 'A', 4: 'A', 5: 'B', 6: 'B', 7: 'B', 8: 'B', 9: 'B'};
-
-		// Phase B if a pl-row's Qty Shipped (IF) is non-blank, else Phase A — mirrors data-qs
-		// (raw custrecord_twms_wavei_qtyshipped) already stamped on each pl-row.
-		function plRowPhase($plRow) {
-			var qs = $plRow.attr('data-qs');
-			return (qs != null && String(qs).trim() !== '') ? 'B' : 'A';
-		}
-
-		jQuery(document).off('change.shortorder-reasonphase', '.item-reason').on('change.shortorder-reasonphase', '.item-reason', function () {
-			var $sel = jQuery(this);
-			var $row = $sel.closest('tr.item-row');
-			var said = $row.attr('data-said');
-			var lineid = $row.attr('data-lineid');
-			var $warn = $row.find('.item-reason-phase-warn');
-
-			var reasonId = parseInt($sel.val(), 10);
-			var reasonPhase = REASON_ID_PHASE[reasonId];  // undefined → unknown reason, skip check
-
-			if (!reasonPhase) { $warn.hide(); return; }
-
-			var $plChildren = jQuery('tr.item-children[data-said="' + said + '"][data-lineid="' + lineid + '"]');
-			var mismatch = false;
-			$plChildren.find('tr.pl-row').each(function () {
-				var $pl = jQuery(this);
-				if (!$pl.find('.pl-sel').is(':checked')) return;  // only selected rows matter
-				var rowPhase = plRowPhase($pl);
-				if (rowPhase !== reasonPhase) mismatch = true;
-			});
-
-			$warn.toggle(mismatch);
 		});
 	} catch (e) {
 		// no-op
@@ -535,15 +424,13 @@ function SaveRecord(scriptContext) {
 					waveLineId: $pl.find('.col-wave-line').data('wave-line') != null ? String($pl.find('.col-wave-line').data('wave-line')) : '',
 					toId: $pl.find('.col-to-id').data('to-id') != null ? String($pl.find('.col-to-id').data('to-id')) : '',
 					toLineId: $pl.find('.col-to-line').data('to-line') != null ? String($pl.find('.col-to-line').data('to-line')) : '',
-					// pl-row column indices (after adding Do not Cal Conv + NW + GW columns, AND the
-					// Wave Qty / Qty Shipped (IF) split — every index from the old "17:QtyShipped"
-					// onward shifted +1 to make room for the new Wave Qty column):
+					// pl-row column indices (after adding Do not Cal Conv + NW + GW columns):
 					// 0:Sel 1:PlanLoad 2:ShortCon 3:ConIndex 4:ConSize 5:ConName1
 					// 6:SealNo1 7:QtyPlanLoad 8:SalesUnit 9:ConvPal(PL) 10:ConvRoll(PL)
 					// 11:RefTransferOrder 12:ToLine(hidden) 13:ToId(hidden) 14:WaveNo
-					// 15:WaveLine(hidden) 16:RefItemFulfillment 17:WaveQty 18:QtyShipped(IF) 19:Unit
-					// 20:DoNotCalConv(checkbox) 21:ConvPal(IF)(input) 22:ConvRoll(IF)(input)
-					// 23:NetWeight(input) 24:GrossWeight(input) 25:Inactive
+					// 15:WaveLine(hidden) 16:RefItemFulfillment 17:QtyShipped 18:Unit
+					// 19:DoNotCalConv(checkbox) 20:ConvPal(IF)(input) 21:ConvRoll(IF)(input)
+					// 22:NetWeight(input) 23:GrossWeight(input) 24:Inactive
 					planLoad: jQuery.trim($pl.find('td').eq(1).text()),    // Plan Load
 					// col 2 = Short whole container checkbox
 					conIndex: jQuery.trim($pl.find('td').eq(3).text()),    // Container Index
@@ -559,37 +446,19 @@ function SaveRecord(scriptContext) {
 					waveNo: jQuery.trim($pl.find('td').eq(14).text()),    // Ref. Wave No.
 					// index 15 = hidden col-wave-line
 					refFulfillment: jQuery.trim($pl.find('td').eq(16).text()),  // Ref. Item Fulfillment
-					waveQty: jQuery.trim($pl.find('td').eq(17).text()),          // Wave Qty (raw, NEW column)
-					qtyShipped: jQuery.trim($pl.find('td').eq(18).text()),       // Qty Shipped (IF) (raw, blank until Gen IF)
-					uom: jQuery.trim($pl.find('td').eq(19).text()),              // Unit (UOM)
-					// col 20 = Do not Cal Conv (disabled checkbox) — read flag
+					qtyShipped: jQuery.trim($pl.find('td').eq(17).text()),       // Qty Shipped
+					uom: jQuery.trim($pl.find('td').eq(18).text()),              // Unit (UOM)
+					// col 19 = Do not Cal Conv (disabled checkbox) — read flag
 					convNotCal: $pl.find('.pl-do-not-cal-conv').is(':checked'),
-					// cols 21-24 = inputs (editable only when convNotCal=true)
+					// cols 20-23 = inputs (editable only when convNotCal=true)
 					convPalIF: jQuery.trim($pl.find('.pl-conv-pal-if').val() || ''),
 					convRollIF: jQuery.trim($pl.find('.pl-conv-roll-if').val() || ''),
 					netWeight: jQuery.trim($pl.find('.pl-net-weight').val() || ''),
 					grossWeight: jQuery.trim($pl.find('.pl-gross-weight').val() || ''),
-					inactive: jQuery.trim($pl.find('td').eq(25).text()),         // Inactive (Yes/No)
+					inactive: jQuery.trim($pl.find('td').eq(24).text()),         // Inactive (Yes/No)
 					shortCon: $pl.find('.pl-short-con').is(':checked'),          // Short whole container (current state)
 				});
 			});
-
-			// Effective quantity (fallback resolved client-side) — Qty Shipped (IF) if non-blank,
-			// else Wave Qty. This is the value process_pl actually writes to TO/PL (and the value
-			// whose zero/non-zero state decides the Qty/Line/Container-level branch server-side) —
-			// NOT the raw "Qty Shipped (IF)" column alone, which is blank pre-Gen IF (Phase A).
-			// "Short whole container" FORCES this row to 0 regardless of source value — that's the
-			// entire point of the checkbox (Container-level short), so it must override the
-			// qtyShipped/waveQty fallback, not just exclude the row from the displayed sum.
-			for (var plx = 0; plx < planLoads.length; plx++) {
-				var plEntry = planLoads[plx];
-				if (plEntry.shortCon) {
-					plEntry.effectiveQty = 0;
-					continue;
-				}
-				var qsIfNum = parseFloat(plEntry.qtyShipped);
-				plEntry.effectiveQty = (plEntry.qtyShipped !== '' && !isNaN(qsIfNum)) ? qsIfNum : (parseFloat(plEntry.waveQty) || 0);
-			}
 
 			// If item has no selected pl-row at all → skip item (cascade should prevent this anyway)
 			if (!anySelected) return;
@@ -687,13 +556,6 @@ function UI_startProcess() {
 		var toIdsList = [];      // insertion-order list of toIds (for fair scheduling)
 		var entriesBySaid = {};
 		var totalPlCount = 0;
-		// Container-index batch tracking (Heavy Container timing — Reliability fix #2)
-		var conTotalPls = {};    // conIndex → count of selected+shortCon rows sharing this index
-		var conDonePls = {};     // conIndex → how many of those have completed (success or fail)
-		var conSuccessPls = {};  // conIndex → how many of those succeeded
-		var conSaid = {};        // conIndex → an SA id to use on the close_heavy_container call
-		// Per-PL success tracking (save_sa_body partial-failure fix — Reliability fix #3)
-		var plResultOk = {};     // planLoadId → true/false (only set once its process_pl call returns)
 		for (var i = 0; i < payload.length; i++) {
 			var e = payload[i];
 			if (!entriesBySaid[e.said]) entriesBySaid[e.said] = [];
@@ -714,18 +576,6 @@ function UI_startProcess() {
 					pl: p,
 				});
 				totalPlCount++;
-
-				// Track "Short whole container" batches by Container Index — Heavy Container
-				// isinactive must be set exactly once, after EVERY row sharing this Container
-				// Index has succeeded (Reliability fix — never inside the per-row loop).
-				var pShortCon = (p.shortCon === true || p.shortCon === 'true' || p.shortCon === 'T');
-				var pConIndex = (p.conIndex || '').trim();
-				if (pShortCon && pConIndex) {
-					conTotalPls[pConIndex] = (conTotalPls[pConIndex] || 0) + 1;
-					conDonePls[pConIndex] = conDonePls[pConIndex] || 0;
-					conSuccessPls[pConIndex] = conSuccessPls[pConIndex] || 0;
-					if (!conSaid[pConIndex]) conSaid[pConIndex] = e.said;
-				}
 			}
 		}
 
@@ -819,55 +669,10 @@ function UI_startProcess() {
 			return data.msg || 'Failed';
 		}
 
-		// Recompute an item entry's totalQtyShippedDisp from the ACTUAL per-PL process_pl results
-		// (Reliability fix #3 — save_sa_body partial-failure fix). For each PL under this item:
-		//   - selected AND succeeded (or not part of this run at all) → contribute its effective qty
-		//   - selected AND FAILED this run → revert that row's contribution to whatever effectiveQty
-		//     was ALREADY shown to the user before this Start Process attempt (i.e. the last
-		//     successfully-confirmed value — qtyShipped(IF) ?? waveQty, same read-side source as
-		//     plEntry.effectiveQty above), NOT qtyConfirm (the pristine original PI/SA plan qty).
-		//     A container may already have been short-adjusted in an EARLIER run; reverting all the
-		//     way to qtyConfirm would silently discard that prior adjustment, inflating the SA qty.
-		function recomputeEntryTotalQtyShipped(entry) {
-			var pls = entry.planLoads || [];
-			var total = 0;
-			for (var k = 0; k < pls.length; k++) {
-				var plk = pls[k];
-				total += parseFloat(plk.effectiveQty) || 0;
-			}
-			total = parseFloat(total.toFixed(3));
-			return (total === Math.floor(total)) ? String(total) : total.toFixed(3);
-		}
-
-		// Fire close_heavy_container for ONE container — only ever called after every selected
-		// pl-row sharing that Container Index has succeeded in process_pl (see call site below).
-		function fireCloseHeavyContainer(conIndex, saidForCall) {
-			var postParams = jQuery.extend({}, nsTokens, {
-				step: 'ajaxsync',
-				action: 'close_heavy_container',
-				said: saidForCall || '',
-				conIndex: conIndex,
-			});
-			jQuery.post(ajaxUrl, postParams).done(function (resp) {
-				var data = parseAjaxResponse(resp);
-				if (data.ok) {
-					console.log('[heavycontainer] container ' + conIndex + ' inactivated:', data.updated);
-				} else {
-					console.error('[heavycontainer] container ' + conIndex + ' fail:', data);
-				}
-			}).fail(function (jqXHR, textStatus, error) {
-				console.error('[heavycontainer] AJAX fail for container ' + conIndex, jqXHR, textStatus, error);
-			});
-		}
-
 		// Fire save_sa_body for an SA after all its PLs have completed.
 		function fireSaveSaBody(said) {
 			setSaStatus(said, spinnerImg ? '<img src="' + spinnerImg + '" width="18">' : '⟳', 'Saving SA body...', '#1f4e79');
 			var entries = entriesBySaid[said] || [];
-			// Recompute each item's total from actual process_pl outcomes before sending (Reliability fix #3)
-			for (var ri = 0; ri < entries.length; ri++) {
-				entries[ri].totalQtyShippedDisp = recomputeEntryTotalQtyShipped(entries[ri]);
-			}
 			var postParams = jQuery.extend({}, nsTokens, {
 				step: 'ajaxsync',
 				action: 'save_sa_body',
@@ -924,26 +729,9 @@ function UI_startProcess() {
 						said: saidLocal,
 						entry: JSON.stringify({reason: itemLocal.reason, pl: itemLocal.pl}),
 					});
-					var plConIndex = (itemLocal.pl.conIndex || '').trim();
-					var plShortCon = (itemLocal.pl.shortCon === true || itemLocal.pl.shortCon === 'true' || itemLocal.pl.shortCon === 'T');
-
-					function handleContainerBatch(succeeded) {
-						if (!plShortCon || !plConIndex || !conTotalPls[plConIndex]) return;
-						conDonePls[plConIndex] = (conDonePls[plConIndex] || 0) + 1;
-						if (succeeded) conSuccessPls[plConIndex] = (conSuccessPls[plConIndex] || 0) + 1;
-						if (conDonePls[plConIndex] === conTotalPls[plConIndex]) {
-							if (conSuccessPls[plConIndex] === conTotalPls[plConIndex]) {
-								fireCloseHeavyContainer(plConIndex, conSaid[plConIndex]);
-							} else {
-								console.warn('[heavycontainer] container ' + plConIndex + ' had 1+ failed rows — Heavy Container NOT inactivated this run (re-run to retry)');
-							}
-						}
-					}
-
 					jQuery.post(ajaxUrl, postParams).done(function (resp) {
 						var data = parseAjaxResponse(resp);
 						saDonePls[saidLocal] = (saDonePls[saidLocal] || 0) + 1;
-						plResultOk[plidLocal] = !!data.ok;
 						if (data.ok) {
 							saSuccessPls[saidLocal] = (saSuccessPls[saidLocal] || 0) + 1;
 							var nUpd = (data.updated || []).length;
@@ -951,7 +739,6 @@ function UI_startProcess() {
 						} else {
 							setPlStatus(plidLocal, '✗', formatFailMsg(data), '#c62828');
 						}
-						handleContainerBatch(!!data.ok);
 						// If this was the last PL for the SA → save_sa_body (only if at least 1 PL succeeded)
 						if (saDonePls[saidLocal] === saTotalPls[saidLocal]) {
 							if (saSuccessPls[saidLocal] > 0) {
@@ -981,8 +768,6 @@ function UI_startProcess() {
 						console.error('AJAX fail [pl ' + plidLocal + ']', jqXHR, textStatus, error);
 						setPlStatus(plidLocal, '✗', fullMsg, '#c62828');
 						saDonePls[saidLocal] = (saDonePls[saidLocal] || 0) + 1;
-						plResultOk[plidLocal] = false;
-						handleContainerBatch(false);
 						if (saDonePls[saidLocal] === saTotalPls[saidLocal]) {
 							if (saSuccessPls[saidLocal] > 0) {
 								fireSaveSaBody(saidLocal);

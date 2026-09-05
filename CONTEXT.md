@@ -13,14 +13,17 @@ Sales Order ที่เป็นใบ Shipping Advice (`custbody_is_shippingad
 _Avoid_: Shipping Order
 
 **Plan Load**:
-Custom record (`customrecord_exp_item_information_pl`) ระดับ container ที่แตกออกมาจาก SA line หนึ่งรายการ — 1 แถว Plan Load = 1 container
+การวางแผนบรรจุของทั้งหมดของ 1 SA — **1 SA = 1 Plan Load เสมอ** (concept level ไม่ใช่ record เดี่ยว)
+
+**Plan Load Line Item Detail** (`customrecord_exp_item_information_pl`, เรียกในโค้ดว่า "Plan Load" หรือ "PL"):
+Detail record ที่ Plan Load แตกออกมาตาม **(SA item-line × container)** — 1 แถว = 1 คู่ item-กับ-container หนึ่งคู่เท่านั้น **ไม่ใช่ 1 container** — เพราะ **1 container มีได้หลาย item พร้อมกัน** (จึงมีหลาย Detail row ที่ container เดียวกันได้ ถ้ามีหลาย item ในตู้นั้น) และ 1 item ก็กระจายไปหลาย container ได้เช่นกัน (จึงมีหลาย Detail row ของ item เดียวกันคนละ container ได้)
 _Avoid_: PL, Item Info
 
 **TO (Transfer Order)**:
-เอกสารโอนสินค้าที่สร้างจาก Plan Load — **1 container = 1 TO เสมอ** (ความสัมพันธ์ 1:1)
+เอกสารโอนสินค้า — **1 container = 1 TO เสมอ** (1:1) — แต่ 1 TO มีได้**หลาย line** (1 line ต่อ 1 item ที่อยู่ในตู้นั้น) แต่ละ line ผูกกับ Plan Load Line Item Detail 1 แถว ผ่าน `custcol_to_plan_load_line`
 
 **Wave**:
-Custom record (`customrecord_twms_wave_item`, เรียกในโค้ดว่า "Wave Line") ของระบบ WMS ที่ผูกกับ TO หนึ่งใบ — **1 container = 1 Wave เสมอ** (ความสัมพันธ์ 1:1 กับทั้ง container และ TO)
+Custom record (`customrecord_twms_wave_item`, เรียกในโค้ดว่า "Wave Line" หรือ "Wave Item") ของระบบ WMS — **1 container = 1 Wave เสมอ** (1:1 กับทั้ง container และ TO) เช่นเดียวกับ TO, 1 Wave มีได้หลาย Wave Item record (1 ต่อ 1 item ในตู้นั้น)
 
 **Scan Packed**:
 ขั้นตอนยืนยันการแพ็คของในคลังผ่านการสแกน — เกิดหลัง Wave ถูกสร้าง และก่อน Gen IF
@@ -36,7 +39,7 @@ PI → SA → Plan Load → TO → Wave → Wave (Scan Packed) → Wave (Scan Sh
 _ที่มา: ยืนยันโดยผู้ใช้ 2026-09-04 — เป็นลำดับบังคับของสาย Export/Transfer container หนึ่งใบ_
 
 **Container invariant**:
-1 ตู้ container = 1 TO = 1 Wave เสมอ (ความสัมพันธ์ตายตัว ไม่มี TO/Wave ไหนครอบคลุมหลายตู้ หรือตู้เดียวกระจายหลาย TO/Wave)
+1 ตู้ container = 1 TO = 1 Wave เสมอ (ความสัมพันธ์ตายตัว ไม่มี TO/Wave ไหนครอบคลุมหลายตู้ หรือตู้เดียวกระจายหลาย TO/Wave) **แต่ 1 ตู้มีได้หลาย item พร้อมกัน** — ดังนั้น TO/Wave 1 ใบ มีได้หลาย line/detail record ข้างใน (1 ต่อ 1 item)
 
 **Qty Confirm** (`custrecord_item_info_qty_confirm` บน Plan Load):
 ปริมาณ "ตามแผน" (order intent) — stamp มาตั้งแต่ PI → SA → Plan Load ตอนสร้าง Plan Load เลย ไม่เกี่ยวข้องกับ Wave หรือการสแกนใดๆ ทั้งสิ้น
@@ -57,5 +60,18 @@ _Avoid_: Wave Qty
 **Gram Swing**:
 ปรากฏการณ์เฉพาะสินค้าม้วนกระดาษ (paper roll) — น้ำหนักจริงหลังผลิตเสร็จไม่ตรงกับน้ำหนักตาม UOM ที่ระบุไว้ตอนเปิด PI/SA (ซึ่งมักเปิดจำนวน/น้ำหนักไว้เผื่อสูงกว่าจริงเสมอ) ทำให้สินค้ากลุ่มนี้เกิด **Phase A Short แทบทุกครั้งเป็นเรื่องปกติของสายธุรกิจ ไม่ใช่อุบัติเหตุ** — Container เดียวกันอาจถูก Short ซ้ำได้อีกรอบใน Phase B ทีหลัง ถ้าเกิดอุบัติเหตุหลังรถออกจากโรงงาน (Phase A กับ Phase B **ไม่ exclusive กัน** เกิดต่อเนื่องกับ container เดียวกันได้)
 
-**Short granularity**:
-หน่วยเล็กที่สุดของ Short คือระดับ **Container** (1 ตู้) แบ่งเป็น **Qty-level** (โหลดได้บางส่วน) กับ **Container-level** (โหลดไม่ได้เลย = 0) — **Line Item-level ไม่ใช่กลไกแยก** แต่เป็นผลรวม (rollup) ของหลาย Container ภายใต้ SA item line เดียวกันที่ short พร้อมกัน ไม่ว่าจะบางส่วนหรือทั้งหมดของ container เหล่านั้น
+**Short granularity** (แก้ไข 2026-09-05 — เดิมเข้าใจผิดว่า Container คือหน่วยเล็กสุด):
+หน่วยเล็กที่สุดจริงๆ คือ **Plan Load Line Item Detail 1 แถว** (= 1 คู่ item×container) แบ่งเป็น 3 ระดับ:
+- **Qty-level**: ลดจำนวนบางส่วนใน 1 Detail row (1 item ของ 1 ตู้) ไม่ถึง 0
+- **Line-level** ("Short Line"): 1 Detail row (1 item ของ 1 ตู้) ถูกลดเป็น **0 ทั้งหมด** — กระทบแค่ item นั้นใน container นั้น item อื่นในตู้เดียวกันไม่กระทบ
+- **Container-level**: **ทุก** Detail row ที่แชร์ container เดียวกัน (ทุก item ในตู้นั้น) ถูกลดเป็น 0 พร้อมกันทั้งหมด — คือ Line-level ที่เกิดกับทุก item ของตู้นั้นพร้อมกัน
+
+**Heavy Container** (`customrecord_heavy_container`):
+Record แยกต่างหาก 1 แถวต่อ 1 container (ไม่ใช่ต่อ item เหมือน Plan Load Item Detail) — เก็บรายละเอียดของตัวตู้เอง match กับ container index ผ่าน `custrecord_hc_container_index` ใช้แสดงผลใน Print Form Container List — ต้องตั้ง `isinactive=true` เมื่อตู้นั้นถูก Short-ทั้งตู้ (ไม่แตะตอน Line-level ที่ตู้ยังส่งจริง)
+
+**Qty Old preservation fields** (เขียนครั้งแรกที่ short เกิดขึ้นเท่านั้น ไม่เขียนทับซ้ำ):
+- SA line: `custcol_shortshipment_qty_old`
+- TO line: **field เดียวกัน** `custcol_shortshipment_qty_old` (custom column ใช้ร่วมหลาย transaction type)
+- Plan Load Item Detail: `custrecord_item_info_short_qty_old` (field ใหม่ กำลังสร้าง 2026-09-05)
+
+**SA Item-line rollup**: ไม่ใช่กลไกแยก แต่เป็นมุมมองสรุป — 1 SA item-line (1 item) อาจกระจายไปหลาย container ผ่านหลาย Detail row; ยอดที่โชว์บน SA line คือผลรวมของ Detail row ทั้งหมดของ item นั้นข้ามทุก container (แต่ละแถวจะเป็น Qty/Line/Container-level อะไรก็ได้ผสมกันได้)
