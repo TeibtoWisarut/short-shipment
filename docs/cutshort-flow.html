@@ -1,0 +1,632 @@
+<title>Cut Short Flow</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+
+  :root{
+    --bg:#eef1f3; --surface:#ffffff; --surface-2:#e4e9ec;
+    --ink:#1b232c; --ink-dim:#5b6b78; --ink-faint:#8b98a2;
+    --line:#d7dde1; --line-strong:#b9c2c8;
+    --accent:#1f6f78; --accent-ink:#0d3236; --accent-soft:#dcedee;
+    --warn:#b5541f; --warn-soft:#f7e5d9;
+    --good:#2f7d5c; --good-soft:#dcefe5;
+    --mono:'IBM Plex Mono',ui-monospace,monospace;
+    --sans:'IBM Plex Sans','IBM Plex Sans Thai',ui-sans-serif,sans-serif;
+    --disp:'Archivo',var(--sans);
+    --radius:10px;
+    --shadow:0 1px 2px rgba(20,30,36,.06), 0 8px 24px -12px rgba(20,30,36,.18);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#11161a; --surface:#1a2127; --surface-2:#222a31;
+      --ink:#e9edef; --ink-dim:#a3b0b8; --ink-faint:#75838c;
+      --line:#2c363d; --line-strong:#3c4850;
+      --accent:#5cc0c9; --accent-ink:#d9f3f4; --accent-soft:#1c3336;
+      --warn:#e2965a; --warn-soft:#3a2a1c;
+      --good:#6cc79c; --good-soft:#1c3328;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#11161a; --surface:#1a2127; --surface-2:#222a31;
+    --ink:#e9edef; --ink-dim:#a3b0b8; --ink-faint:#75838c;
+    --line:#2c363d; --line-strong:#3c4850;
+    --accent:#5cc0c9; --accent-ink:#d9f3f4; --accent-soft:#1c3336;
+    --warn:#e2965a; --warn-soft:#3a2a1c;
+    --good:#6cc79c; --good-soft:#1c3328;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px -12px rgba(0,0,0,.5);
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans);
+    font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{font-family:var(--disp); text-wrap:balance; margin:0; color:var(--ink);}
+  code, .mono{font-family:var(--mono);}
+  p{margin:0 0 .9em; max-width:66ch;}
+  a{color:var(--accent);}
+
+  .shell{display:grid; grid-template-columns:250px 1fr; min-height:100vh;}
+  @media (max-width:880px){ .shell{grid-template-columns:1fr;} .nav{position:static; height:auto;} }
+
+  .nav{
+    position:sticky; top:0; height:100vh; overflow-y:auto;
+    border-right:1px solid var(--line); padding:28px 18px;
+    display:flex; flex-direction:column; gap:2px;
+  }
+  .nav-brand{font-family:var(--disp); font-weight:800; font-size:1.05rem; margin-bottom:4px;}
+  .nav-sub{font-size:.78rem; color:var(--ink-faint); margin-bottom:20px;}
+  .nav a{
+    display:block; padding:7px 10px; border-radius:7px; color:var(--ink-dim);
+    text-decoration:none; font-size:.86rem; font-weight:500;
+  }
+  .nav a:hover{background:var(--surface-2); color:var(--ink);}
+  .nav .grp{font-size:.68rem; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-faint); margin:16px 10px 4px; font-weight:600;}
+
+  main{padding:44px clamp(20px,4vw,64px) 100px; max-width:1080px;}
+
+  header.hero{margin-bottom:40px; padding-bottom:28px; border-bottom:1px solid var(--line);}
+  .eyebrow{
+    display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:.72rem;
+    letter-spacing:.06em; text-transform:uppercase; color:var(--accent); background:var(--accent-soft);
+    padding:4px 10px; border-radius:99px; margin-bottom:14px; font-weight:500;
+  }
+  h1.title{font-size:clamp(1.7rem,3.2vw,2.5rem); font-weight:800; letter-spacing:-.01em;}
+  .hero p{font-size:1.02rem; color:var(--ink-dim); max-width:60ch; margin-top:10px;}
+
+  section{margin:64px 0;}
+  section h2{font-size:1.5rem; font-weight:700; margin-bottom:6px;}
+  .section-note{color:var(--ink-dim); font-size:.92rem; margin-bottom:22px; max-width:64ch;}
+  .kicker{font-family:var(--mono); font-size:.72rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); margin-bottom:6px;}
+
+  figure{margin:0;}
+  figcaption{font-size:.83rem; color:var(--ink-dim); margin-top:10px; max-width:70ch;}
+
+  .diagram-wrap{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px; overflow-x:auto; box-shadow:var(--shadow);
+  }
+  .diagram-wrap svg{display:block; margin:0 auto; min-width:560px;}
+
+  .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; margin-top:18px;}
+  .card{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    padding:20px; box-shadow:var(--shadow); display:flex; flex-direction:column; gap:10px;
+  }
+  .card h3{font-size:1.05rem;}
+  .card .tag{
+    align-self:flex-start; font-family:var(--mono); font-size:.7rem; font-weight:500;
+    padding:3px 9px; border-radius:99px; letter-spacing:.03em;
+  }
+  .tag.phaseA{background:var(--warn-soft); color:var(--warn);}
+  .tag.phaseB{background:var(--good-soft); color:var(--good);}
+  .card dl{margin:4px 0 0; display:grid; grid-template-columns:auto 1fr; gap:6px 12px; font-size:.86rem;}
+  .card dt{color:var(--ink-faint); font-weight:500;}
+  .card dd{margin:0; color:var(--ink);}
+
+  .table-scroll{overflow-x:auto; border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow);}
+  table{border-collapse:collapse; width:100%; min-width:760px; background:var(--surface);}
+  th,td{padding:10px 14px; text-align:left; border-bottom:1px solid var(--line); font-size:.86rem; vertical-align:top;}
+  thead th{
+    background:var(--surface-2); font-family:var(--mono); font-size:.7rem; text-transform:uppercase;
+    letter-spacing:.05em; color:var(--ink-dim); font-weight:500; white-space:nowrap;
+  }
+  tbody tr:last-child td{border-bottom:none;}
+  tbody th{font-weight:600; white-space:nowrap; background:var(--surface);}
+  td.center{text-align:center; font-variant-numeric:tabular-nums;}
+  .yes{color:var(--good); font-weight:700;}
+  .no{color:var(--ink-faint);}
+  .zero{color:var(--warn); font-weight:700;}
+  .rowgrp-a td, .rowgrp-a th{background:color-mix(in srgb, var(--warn-soft) 35%, var(--surface));}
+  .rowgrp-b td, .rowgrp-b th{background:color-mix(in srgb, var(--good-soft) 35%, var(--surface));}
+
+  .field-chip{
+    font-family:var(--mono); font-size:.78rem; background:var(--surface-2); color:var(--ink);
+    padding:2px 7px; border-radius:5px; border:1px solid var(--line); white-space:nowrap;
+  }
+  .field-new{background:var(--accent-soft); color:var(--accent-ink); border-color:var(--accent);}
+
+  .case{
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--shadow); margin-bottom:16px; overflow:hidden;
+  }
+  .case-head{
+    display:flex; align-items:center; justify-content:space-between; gap:16px;
+    padding:16px 20px; cursor:pointer; user-select:none; list-style:none;
+  }
+  .case-head::-webkit-details-marker{display:none;}
+  .case-head h3{font-size:1.05rem; display:flex; align-items:center; gap:10px;}
+  .case-num{
+    font-family:var(--mono); font-size:.78rem; width:26px; height:26px; border-radius:50%;
+    display:inline-flex; align-items:center; justify-content:center; background:var(--surface-2); color:var(--ink-dim); flex-shrink:0;
+  }
+  .case-chevron{color:var(--ink-faint); transition:transform .15s;}
+  details[open] .case-chevron{transform:rotate(90deg);}
+  .case-body{padding:0 20px 22px; border-top:1px solid var(--line);}
+  .case-body .grid2{display:grid; grid-template-columns:1fr 1fr; gap:20px; margin-top:16px;}
+  @media (max-width:640px){ .case-body .grid2{grid-template-columns:1fr;} }
+  .case-body h4{font-size:.82rem; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-faint); margin-bottom:8px; font-weight:600;}
+  .case-body ul{margin:0; padding-left:1.1em; font-size:.88rem;}
+  .case-body li{margin-bottom:6px;}
+
+  .ref-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px;}
+  .ref-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow);}
+  .ref-card h4{font-size:.9rem; margin-bottom:10px;}
+  .ref-card ul{margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:8px;}
+  .ref-card li{display:flex; justify-content:space-between; gap:10px; font-size:.83rem; align-items:baseline;}
+  .ref-card li span:last-child{color:var(--ink-dim); text-align:right;}
+
+  .callout{
+    background:var(--accent-soft); border:1px solid var(--accent); border-radius:var(--radius);
+    padding:16px 20px; font-size:.9rem; color:var(--accent-ink); margin-top:18px;
+  }
+  .callout.warn{background:var(--warn-soft); border-color:var(--warn); color:var(--ink);}
+  .callout strong{color:inherit;}
+
+  footer{margin-top:80px; padding-top:24px; border-top:1px solid var(--line); font-size:.82rem; color:var(--ink-faint);}
+</style>
+
+<div class="shell">
+  <nav class="nav">
+    <div class="nav-brand">Cut Short Flow</div>
+    <div class="nav-sub">Update Qty Cut Short — reference</div>
+    <a href="#chain">Process Chain</a>
+    <a href="#phases">Phase A vs B</a>
+    <a href="#decision">การตัดสินระดับ Short</a>
+    <a href="#matrix">ตาราง Write-set</a>
+    <div class="grp">รายละเอียดแต่ละเคส</div>
+    <a href="#case-qty">Qty-level</a>
+    <a href="#case-line">Line-level</a>
+    <a href="#case-container">Container-level</a>
+    <a href="#reliability">Reliability</a>
+    <a href="#precision">Decimal Precision</a>
+    <a href="#reference">Field Reference</a>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <span class="eyebrow">● Internal reference — ShortShipment · SB1 tested, all cases pass</span>
+      <h1 class="title">Cut Short Flow</h1>
+      <p>แผนผังการทำงานทั้งหมดของเครื่องมือ <em>Update Qty Cut Short</em> — ตั้งแต่ process chain ของ Export, จุดแบ่ง Phase A/B, จนถึง write-set ที่แม่นยำของทั้ง 3 ระดับ short (Qty / Line / Container) กลับมาเปิดหน้านี้เพื่อทวนภาพรวมได้ทันทีโดยไม่ต้องไล่อ่าน Plan doc ใหม่ — ณ 2026-09-06 ผ่านการทดสอบจริงบน SB1 ครบทั้ง 3 ระดับ × 2 Phase แล้ว (พบและแก้บั๊กจริงรวม 8 จุดระหว่างทาง)</p>
+    </header>
+
+    <!-- ============ PROCESS CHAIN ============ -->
+    <section id="chain">
+      <div class="kicker">01 — Domain</div>
+      <h2>Process Chain ของ 1 Container</h2>
+      <p class="section-note">1 ตู้ container = 1 TO = 1 Wave เสมอ แต่ 1 ตู้มีได้หลาย item — เส้นทางนี้คือลำดับบังคับตั้งแต่เปิด PI จนถึง Gen IF จุดที่ระบบข้าม Phase A ไป Phase B คือ "Gen IF"</p>
+      <figure class="diagram-wrap">
+        <svg viewBox="0 0 980 260" role="img" aria-label="Process chain: PI to SA to Plan Load to TO to Wave to Scan Packed to Scan Shipped to Gen IF, with Phase A spanning TO through Scan Shipped and Phase B starting at Gen IF">
+          <defs>
+            <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+          <!-- phase bands -->
+          <rect x="290" y="34" width="430" height="52" rx="8" fill="var(--warn)" opacity="0.12"/>
+          <text x="505" y="26" text-anchor="middle" font-size="12" font-weight="600" fill="var(--warn)" font-family="IBM Plex Mono">PHASE A — ก่อน Gen IF</text>
+          <rect x="730" y="34" width="200" height="52" rx="8" fill="var(--good)" opacity="0.14"/>
+          <text x="830" y="26" text-anchor="middle" font-size="12" font-weight="600" fill="var(--good)" font-family="IBM Plex Mono">PHASE B</text>
+
+          <!-- nodes -->
+          <g font-family="IBM Plex Sans" font-size="13" fill="currentColor">
+            <!-- PI -->
+            <rect x="20" y="44" width="80" height="36" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <text x="60" y="67" text-anchor="middle">PI</text>
+            <!-- SA -->
+            <rect x="140" y="44" width="80" height="36" rx="7" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <text x="180" y="67" text-anchor="middle">SA</text>
+            <!-- Plan Load -->
+            <rect x="300" y="44" width="120" height="36" rx="7" fill="var(--surface)" stroke="currentColor" stroke-width="1.4"/>
+            <text x="360" y="67" text-anchor="middle" font-size="12">Plan Load</text>
+            <!-- TO -->
+            <rect x="460" y="44" width="80" height="36" rx="7" fill="var(--surface)" stroke="currentColor" stroke-width="1.4"/>
+            <text x="500" y="67" text-anchor="middle">TO</text>
+            <!-- Wave -->
+            <rect x="580" y="44" width="90" height="36" rx="7" fill="var(--surface)" stroke="currentColor" stroke-width="1.4"/>
+            <text x="625" y="67" text-anchor="middle">Wave</text>
+            <!-- gen if -->
+            <rect x="820" y="44" width="110" height="36" rx="7" fill="var(--good)" fill-opacity="0.18" stroke="var(--good)" stroke-width="1.6"/>
+            <text x="875" y="67" text-anchor="middle" fill="var(--good)" font-weight="600">Gen IF</text>
+
+            <!-- arrows -->
+            <line x1="100" y1="62" x2="136" y2="62" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrow)"/>
+            <line x1="220" y1="62" x2="296" y2="62" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrow)"/>
+            <line x1="420" y1="62" x2="456" y2="62" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrow)"/>
+            <line x1="540" y1="62" x2="576" y2="62" stroke="currentColor" stroke-width="1.4" marker-end="url(#arrow)"/>
+          </g>
+
+          <!-- scan sub-steps under wave -->
+          <g font-family="IBM Plex Sans" font-size="11.5" fill="currentColor">
+            <line x1="625" y1="80" x2="625" y2="112" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+            <rect x="565" y="118" width="120" height="30" rx="6" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 2"/>
+            <text x="625" y="137" text-anchor="middle">Scan Packed</text>
+
+            <line x1="625" y1="148" x2="625" y2="172" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+            <rect x="565" y="178" width="120" height="30" rx="6" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 2"/>
+            <text x="625" y="197" text-anchor="middle">Scan Shipped</text>
+
+            <line x1="685" y1="193" x2="816" y2="127" stroke="currentColor" stroke-width="1.2" marker-end="url(#arrow)"/>
+          </g>
+
+          <!-- footnote labels -->
+          <g font-family="IBM Plex Mono" font-size="10.5" fill="var(--ink-dim)">
+            <text x="180" y="105">Sales Order</text>
+            <text x="360" y="105" text-anchor="middle">1 SA = 1 concept</text>
+            <text x="500" y="105" text-anchor="middle">1 ตู้ = 1 TO</text>
+            <text x="625" y="230" text-anchor="middle">1 ตู้ = 1 Wave</text>
+            <text x="875" y="105" text-anchor="middle">รถออกจากโรงงาน</text>
+          </g>
+        </svg>
+        <figcaption>Phase A ครอบตั้งแต่ TO ถูกสร้างจนถึงก่อน Gen IF (รถยังไม่ออกจากโรงงาน) Phase B เริ่มทันทีที่ Gen IF เกิด — Container เดียวกันถูก short ได้ทั้ง 2 Phase คนละรอบ เช่น Gram Swing ใน Phase A ตามด้วยอุบัติเหตุขนส่งใน Phase B</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============ PHASE A vs B ============ -->
+    <section id="phases">
+      <div class="kicker">02 — Domain</div>
+      <h2>Phase A vs Phase B</h2>
+      <p class="section-note">เครื่องมือนี้อ่านค่า "ปริมาณที่ยึดถือ" คนละ field กันไปตาม Phase ของแต่ละ Detail row — Phase ไม่ต้องมี badge บอกแยก เพราะคอลัมน์ "Qty Shipped (IF)" ว่าง/ไม่ว่างบอกอยู่แล้ว</p>
+      <div class="cards">
+        <div class="card">
+          <span class="tag phaseA">PHASE A · ก่อน Gen IF</span>
+          <h3>อ่านจาก Wave Quantity</h3>
+          <dl>
+            <dt>Field</dt><dd><span class="field-chip">custrecord_twms_wavei_wavequantity</span></dd>
+            <dt>ที่มา</dt><dd>Warehouse แก้ Wave Qty + TO qty เองผ่านกระบวนการนอกเครื่องมือนี้ ก่อนโหลดของจริง</dd>
+            <dt>เครื่องมือทำอะไร</dt><dd>อ่านค่าที่ถูกต้องแล้ว cascade ลง SA เท่านั้น ไม่ใช่จุดกรอกยอดจริง</dd>
+            <dt>ตัวอย่าง</dt><dd>Gram Swing — น้ำหนักม้วนกระดาษจริงคลาดจาก UOM</dd>
+          </dl>
+        </div>
+        <div class="card">
+          <span class="tag phaseB">PHASE B · หลัง Gen IF</span>
+          <h3>อ่านจาก Qty Shipped</h3>
+          <dl>
+            <dt>Field</dt><dd><span class="field-chip">custrecord_twms_wavei_qtyshipped</span></dd>
+            <dt>ที่มา</dt><dd>Sync อัตโนมัติจาก Item Fulfillment ทันทีที่ Gen IF เกิด</dd>
+            <dt>เครื่องมือทำอะไร</dt><dd>เคสที่ระบบรองรับถูกต้องอยู่แล้ว — ปรับ SA ให้ตรงยอดจริงเพื่อยื่นศุลกากร</dd>
+            <dt>ตัวอย่าง</dt><dd>รถออกจากโรงงานแล้ว แต่ตู้ไปไม่ทันเรือ</dd>
+          </dl>
+        </div>
+      </div>
+      <div class="callout"><strong>Bug เดิม:</strong> ตอน Phase A ยัง<em>ไม่มี</em>ค่าใน Qty Shipped ระบบเก่า fallback ไปที่ <span class="field-chip">custrecord_item_info_qty_confirm</span> (ยอดแผนดั้งเดิม ไม่เคยอัปเดต) แทนที่จะเป็น Wave Quantity — ทำให้ตู้ที่ short ทั้งตู้ใน Phase A แสดงผลเหมือนส่งครบ</div>
+    </section>
+
+    <!-- ============ DECISION TREE ============ -->
+    <section id="decision">
+      <div class="kicker">03 — Logic</div>
+      <h2>การตัดสินระดับ Short</h2>
+      <p class="section-note">ไม่มี checkbox "Line-level" แยกต่างหาก — ระบบดูแค่ 2 อย่าง: ค่าที่คำนวณได้ของ 1 Detail row (1 คู่ item×container) เท่ากับ 0 หรือไม่ และติ๊ก "Short whole container" ไว้หรือเปล่า</p>
+      <figure class="diagram-wrap">
+        <svg viewBox="0 0 900 260" role="img" aria-label="Decision tree: is the row's computed value zero? If no, Qty-level. If yes, is Short whole container ticked? If no, Line-level affecting only this row. If yes, Container-level affecting every row sharing the container index.">
+          <defs>
+            <marker id="arrow2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+          <g font-family="IBM Plex Sans" font-size="13">
+            <rect x="20" y="106" width="190" height="48" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <text x="115" y="126" text-anchor="middle" font-size="12">ค่าของ Detail row</text>
+            <text x="115" y="143" text-anchor="middle" font-size="12" font-weight="600">= 0 ?</text>
+
+            <line x1="210" y1="130" x2="270" y2="60" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"/>
+            <text x="228" y="86" font-size="11" font-family="IBM Plex Mono" fill="var(--ink-dim)">ไม่ใช่</text>
+            <rect x="270" y="30" width="150" height="56" rx="8" fill="var(--accent)" fill-opacity=".12" stroke="var(--accent)" stroke-width="1.5"/>
+            <text x="345" y="53" text-anchor="middle" fill="var(--accent)" font-weight="700">Qty-level</text>
+            <text x="345" y="70" text-anchor="middle" font-size="10.5" fill="var(--ink-dim)">ลดบางส่วน แถวเดียว</text>
+
+            <line x1="210" y1="130" x2="270" y2="190" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"/>
+            <text x="222" y="176" font-size="11" font-family="IBM Plex Mono" fill="var(--ink-dim)">ใช่ (=0)</text>
+            <rect x="270" y="164" width="220" height="52" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <text x="380" y="184" text-anchor="middle" font-size="12">ติ๊ก "Short whole</text>
+            <text x="380" y="200" text-anchor="middle" font-size="12" font-weight="600">container" ?</text>
+
+            <line x1="490" y1="180" x2="560" y2="120" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"/>
+            <text x="512" y="140" font-size="11" font-family="IBM Plex Mono" fill="var(--ink-dim)">ไม่ใช่</text>
+            <rect x="560" y="90" width="180" height="60" rx="8" fill="var(--warn)" fill-opacity=".12" stroke="var(--warn)" stroke-width="1.5"/>
+            <text x="650" y="114" text-anchor="middle" fill="var(--warn)" font-weight="700">Line-level</text>
+            <text x="650" y="131" text-anchor="middle" font-size="10.5" fill="var(--ink-dim)">แถวนี้เท่านั้น</text>
+            <text x="650" y="144" text-anchor="middle" font-size="10.5" fill="var(--ink-dim)">item อื่นในตู้ยังส่งได้</text>
+
+            <line x1="490" y1="200" x2="560" y2="220" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow2)"/>
+            <text x="512" y="234" font-size="11" font-family="IBM Plex Mono" fill="var(--ink-dim)">ใช่</text>
+            <rect x="560" y="190" width="220" height="60" rx="8" fill="var(--warn)" fill-opacity=".22" stroke="var(--warn)" stroke-width="1.8"/>
+            <text x="670" y="214" text-anchor="middle" fill="var(--warn)" font-weight="700">Container-level</text>
+            <text x="670" y="231" text-anchor="middle" font-size="10.5" fill="var(--ink-dim)">ทุก Detail row ที่ container</text>
+            <text x="670" y="244" text-anchor="middle" font-size="10.5" fill="var(--ink-dim)">index เดียวกัน</text>
+          </g>
+        </svg>
+        <figcaption>ติ๊ก "Short whole container" บนแถวไหน → auto-select แถวอื่นที่ container index เดียวกันให้ทันที (ข้ามกิ่ง item ในต้นไม้ได้) — แต่ cascade ทางเดียว: ปลดติ๊กไม่ลาม</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============ MATRIX ============ -->
+    <section id="matrix">
+      <div class="kicker">04 — Reference</div>
+      <h2>ตาราง Write-set เต็ม</h2>
+      <p class="section-note">แถวไล่ตาม 3 ระดับ × 2 Phase — คอลัมน์คือ record ที่อาจถูกแตะ เครื่องหมาย <span class="yes">✓</span> = เขียนจริง, <span class="no">–</span> = ไม่แตะ, <span class="zero">0</span> = ตั้งเป็น 0/inactive/closed</p>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>เคส</th><th>SA line</th><th>Plan Load Detail</th><th>Heavy Container</th><th>TO line</th><th>Wave</th><th>IF / IR</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="rowgrp-a">
+              <th>Qty-level · Phase A</th>
+              <td class="center">qty + qty_old + reason <span class="yes">✓</span></td>
+              <td class="center">reason + short_qty_old <span class="yes">✓</span></td>
+              <td class="center no">–</td>
+              <td class="center">qty + qty_old + reason <span class="yes">✓</span></td>
+              <td class="center">reason <span class="yes">✓</span></td>
+              <td class="center no">– (ยังไม่มี IF)</td>
+            </tr>
+            <tr class="rowgrp-b">
+              <th>Qty-level · Phase B</th>
+              <td class="center">qty + qty_old + reason <span class="yes">✓</span></td>
+              <td class="center">reason + short_qty_old <span class="yes">✓</span></td>
+              <td class="center no">–</td>
+              <td class="center">qty_old + reason <span class="yes">✓</span> — <strong>ไม่แตะ quantity</strong></td>
+              <td class="center">reason <span class="yes">✓</span></td>
+              <td class="center">reason <span class="yes">✓</span></td>
+            </tr>
+            <tr class="rowgrp-a">
+              <th>Line-level · Phase A</th>
+              <td class="center">qty=0 + qty_old + reason</td>
+              <td class="center">isinactive <span class="zero">0</span> + reason</td>
+              <td class="center no">–</td>
+              <td class="center">isclosed <span class="zero">0</span> + qty_old + reason</td>
+              <td class="center">reason <span class="yes">✓</span></td>
+              <td class="center no">– (ยังไม่มี IF)</td>
+            </tr>
+            <tr class="rowgrp-b">
+              <th>Line-level · Phase B</th>
+              <td class="center">qty=0 + qty_old + reason</td>
+              <td class="center">isinactive <span class="zero">0</span> + reason</td>
+              <td class="center no">–</td>
+              <td class="center no">ไม่แตะ isclosed (จบผ่าน IF/IR แล้ว)</td>
+              <td class="center">reason <span class="yes">✓</span></td>
+              <td class="center">reason <span class="yes">✓</span></td>
+            </tr>
+            <tr class="rowgrp-a">
+              <th>Container-level · Phase A</th>
+              <td class="center">qty=0 ทุก item + qty_old + reason</td>
+              <td class="center">isinactive <span class="zero">0</span> ทุกแถว + reason</td>
+              <td class="center"><span class="zero">isinactive</span> (set ครั้งเดียวหลังทุก item สำเร็จ)</td>
+              <td class="center">isclosed <span class="zero">0</span> ทุก line + qty_old + reason</td>
+              <td class="center">reason <span class="yes">✓</span></td>
+              <td class="center no">– (ยังไม่มี IF)</td>
+            </tr>
+            <tr class="rowgrp-b">
+              <th>Container-level · Phase B</th>
+              <td class="center">qty=0 ทุก item + qty_old + reason</td>
+              <td class="center">isinactive <span class="zero">0</span> ทุกแถว + reason</td>
+              <td class="center"><span class="zero">isinactive</span> (set ครั้งเดียวหลังทุก item สำเร็จ)</td>
+              <td class="center no">ไม่แตะ isclosed (จบผ่าน IF/IR แล้ว)</td>
+              <td class="center">reason <span class="yes">✓</span></td>
+              <td class="center">reason <span class="yes">✓</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout warn"><strong>กฎตายตัวทุกเคส:</strong> <span class="field-chip">custrecord_item_info_qty_confirm</span> บน Plan Load Detail — <strong>ห้ามเขียนทับเด็ดขาด</strong> เก็บยอดแผนดั้งเดิมไว้เสมอ ใช้ตอน Regenerate Wave/TO (Cancel + Confirm ใหม่)</div>
+    </section>
+
+    <!-- ============ CASE DETAILS ============ -->
+    <section id="cases">
+      <div class="kicker">05 — Detail</div>
+      <h2>รายละเอียดแต่ละเคส</h2>
+      <p class="section-note">คลิกเพื่อขยายแต่ละเคส — เนื้อหาเดียวกับตารางด้านบนแต่อธิบายเหตุผลประกอบ</p>
+
+      <details class="case" id="case-qty" open>
+        <summary class="case-head">
+          <h3><span class="case-num">1</span>Qty-level — ลดบางส่วน ไม่ถึง 0</h3>
+          <span class="case-chevron">▸</span>
+        </summary>
+        <div class="case-body">
+          <p>เคส "ปกติ" ของเครื่องมือนี้ — ของยังส่งอยู่จริง แค่จำนวนคลาดจากแผน เช่น Gram Swing (น้ำหนักม้วนกระดาษจริงต่างจาก UOM เล็กน้อย)</p>
+          <div class="grid2">
+            <div>
+              <h4>เขียนอะไร</h4>
+              <ul>
+                <li>SA line: <span class="field-chip">quantity</span>, <span class="field-chip">custcol_shortshipment_qty_old</span> (ครั้งแรกที่เปลี่ยน), reason</li>
+                <li>Plan Load Detail: <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> (ใหม่), reason</li>
+                <li>TO line: <span class="field-chip">quantity</span>, <span class="field-chip">custcol_shortshipment_qty_old</span>, reason</li>
+                <li>Wave: reason (+ conv/NW/GW ถ้าติ๊ก "Do not Cal Conv" — ของเดิม ไม่เปลี่ยน)</li>
+              </ul>
+            </div>
+            <div>
+              <h4>ไม่แตะอะไร</h4>
+              <ul>
+                <li><span class="field-chip">custrecord_item_info_qty_confirm</span> — ห้ามเขียนทับ</li>
+                <li><span class="field-chip">isinactive</span> บน Plan Load Detail</li>
+                <li><span class="field-chip">isclosed</span> บน TO line</li>
+                <li>Heavy Container</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="case" id="case-line">
+        <summary class="case-head">
+          <h3><span class="case-num">2</span>Line-level — 1 item ในตู้ = 0</h3>
+          <span class="case-chevron">▸</span>
+        </summary>
+        <div class="case-body">
+          <p>Item นี้ไม่ไปเลย แต่ item อื่นในตู้เดียวกันยังส่งได้ปกติ (ตู้มีได้หลาย item) — ไม่มี checkbox แยก เป็นผลจากค่า = 0 โดยไม่ได้ติ๊ก whole-container</p>
+          <div class="grid2">
+            <div>
+              <h4>เขียนอะไร (เพิ่มจาก Qty-level)</h4>
+              <ul>
+                <li>Plan Load Detail แถวนี้: <span class="field-chip">isinactive</span> = true</li>
+                <li>TO line นี้: <span class="field-chip">isclosed</span> = true — <strong>เฉพาะ Phase A</strong> และเฉพาะถ้ายังไม่ closed</li>
+                <li>Phase B: ไม่แตะ <span class="field-chip">isclosed</span> เลย (TO จบ lifecycle ผ่าน IF/IR ไปแล้ว)</li>
+              </ul>
+            </div>
+            <div>
+              <h4>ทดสอบแล้วบน SB1 sandbox</h4>
+              <ul>
+                <li>Close 1 line ของ TO หลายบรรทัด → Order Status ไล่ปกติ Pending Fulfillment → Pending Receipt → Closed ไม่เพี้ยน</li>
+                <li>TO line <span class="field-chip">quantity=0</span> ถูก NetSuite บล็อกเสมอ ("must have a positive count") — Close คือทางเดียวที่ทำได้จริง</li>
+                <li><strong>ไม่แตะ Heavy Container</strong> — ตู้จริงยังไปอยู่</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="case" id="case-container">
+        <summary class="case-head">
+          <h3><span class="case-num">3</span>Container-level — ทั้งตู้ = 0</h3>
+          <span class="case-chevron">▸</span>
+        </summary>
+        <div class="case-body">
+          <p>ทุก item ในตู้นั้น short พร้อมกันหมด (เช่น อุบัติเหตุหน้าโรงงานก่อน Load) — ติ๊ก "Short whole container" แล้วระบบ auto-select ทุกแถวที่ container index เดียวกันให้</p>
+          <div class="grid2">
+            <div>
+              <h4>เขียนอะไร (= Line-level × ทุก item ในตู้)</h4>
+              <ul>
+                <li>ทุก Plan Load Detail row ที่ container index เดียวกัน: isinactive + reason + short_qty_old</li>
+                <li>ทุก TO line ของตู้นั้น: isclosed (Phase A) / ข้าม (Phase B) + qty_old + reason</li>
+                <li>Heavy Container 1 แถว (match ด้วย <span class="field-chip">custrecord_hc_container_index</span> <strong>+</strong> <span class="field-chip">custrecord_hc_ref_sa</span> คู่กัน — index อย่างเดียวไม่ unique ข้าม SA เจอจริงว่าซ้ำกัน 338 แถวทั้งระบบ): isinactive</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Timing สำคัญ</h4>
+              <ul>
+                <li>Heavy Container ถูก set <strong>ครั้งเดียวหลังจากทุก item ในตู้สำเร็จครบ 100%</strong> เท่านั้น — ไม่ set แบบ per-item</li>
+                <li>ถ้ามี item ไหน fail ระหว่างทาง → ไม่ set Heavy Container เลย ปล่อยให้เห็น error แล้ว run ซ้ำ</li>
+                <li>ป้องกันเคส "ตู้ปิดไม่ครบ" ที่ Heavy Container บอกว่าตู้ไม่ไป ทั้งที่บาง item ยังไปจริง</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </details>
+    </section>
+
+    <!-- ============ RELIABILITY ============ -->
+    <section id="reliability">
+      <div class="kicker">06 — Reliability</div>
+      <h2>Partial-failure &amp; Retry</h2>
+      <p class="section-note">แก้ปัญหาเดิม: <span class="field-chip">save_sa_body</span> เคยใช้ยอดที่ "ควรจะเป็น" จาก payload ก่อนยิง AJAX ไม่ได้ปรับตามผลจริงของแต่ละ container</p>
+      <figure class="diagram-wrap">
+        <svg viewBox="0 0 940 220" role="img" aria-label="For each PL call: try TO or IF/IR save, retry up to 3 total attempts only on RCRD_HAS_BEEN_CHANGED with no delay, otherwise fail immediately. After every PL call for the SA is done, recompute quantities from confirmed successes only, then call save_sa_body, and set Heavy Container only if the whole container batch succeeded.">
+          <defs>
+            <marker id="arrow3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+          <g font-family="IBM Plex Sans" font-size="12.5">
+            <rect x="20" y="20" width="150" height="42" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <text x="95" y="46" text-anchor="middle">process_pl (1 แถว)</text>
+
+            <line x1="170" y1="41" x2="216" y2="41" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow3)"/>
+            <rect x="216" y="20" width="150" height="42" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <text x="291" y="40" text-anchor="middle">TO / IF-IR</text>
+            <text x="291" y="55" text-anchor="middle" font-size="10.5" fill="var(--ink-dim)">load + save</text>
+
+            <line x1="291" y1="62" x2="291" y2="96" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow3)"/>
+            <rect x="216" y="96" width="150" height="46" rx="8" fill="var(--warn)" fill-opacity=".12" stroke="var(--warn)" stroke-width="1.4"/>
+            <text x="291" y="117" text-anchor="middle" fill="var(--warn)" font-weight="600" font-size="12">RCRD_HAS_BEEN</text>
+            <text x="291" y="132" text-anchor="middle" fill="var(--warn)" font-weight="600" font-size="12">_CHANGED ?</text>
+
+            <path d="M366 119 L 420 119 Q 440 119 440 99 L 440 62 Q 440 42 420 42 L 366 42" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow3)"/>
+            <text x="450" y="80" font-size="10.5" font-family="IBM Plex Mono" fill="var(--ink-dim)" transform="rotate(90 450 80)">retry ×2, ไม่มี delay</text>
+
+            <line x1="291" y1="142" x2="291" y2="170" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow3)"/>
+            <text x="305" y="160" font-size="11" fill="var(--ink-dim)">3 ครั้งแล้วยังชน / error อื่น</text>
+            <rect x="216" y="170" width="150" height="38" rx="8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 2"/>
+            <text x="291" y="194" text-anchor="middle" font-size="11.5">fail → user run ซ้ำเอง</text>
+
+            <!-- right side: aggregation -->
+            <rect x="560" y="20" width="180" height="46" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <text x="650" y="40" text-anchor="middle">ทุก PL ของ SA</text>
+            <text x="650" y="56" text-anchor="middle" font-size="10.5" fill="var(--ink-dim)">เสร็จครบ (สำเร็จ/พลาด)</text>
+
+            <line x1="650" y1="66" x2="650" y2="96" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow3)"/>
+            <rect x="560" y="96" width="180" height="50" rx="8" fill="var(--accent)" fill-opacity=".12" stroke="var(--accent)" stroke-width="1.5"/>
+            <text x="650" y="117" text-anchor="middle" fill="var(--accent)" font-weight="600" font-size="12">Recompute จากผลจริง</text>
+            <text x="650" y="133" text-anchor="middle" font-size="10.5" fill="var(--ink-dim)">ตัด container ที่ fail ออก</text>
+
+            <line x1="650" y1="146" x2="650" y2="172" stroke="currentColor" stroke-width="1.3" marker-end="url(#arrow3)"/>
+            <rect x="560" y="172" width="180" height="36" rx="8" fill="none" stroke="currentColor" stroke-width="1.4"/>
+            <text x="650" y="194" text-anchor="middle" font-size="12">save_sa_body</text>
+          </g>
+        </svg>
+        <figcaption>Retry ครอบทั้ง TO section และ IF/IR section ใน <code>process_pl</code> — 3 attempts รวม ไม่มี delay (SuiteScript ไม่มี sleep API ฝั่ง server) ฝั่ง CS <code>UI_startProcess</code> track ผลจริงของทุก call แล้ว recompute ก่อนเรียก <code>save_sa_body</code> เสมอ</figcaption>
+      </figure>
+    </section>
+
+    <!-- ============ DECIMAL PRECISION ============ -->
+    <section id="precision">
+      <div class="kicker">07 — Precision</div>
+      <h2>SA 3 ตำแหน่ง vs TO/Wave conversion จริง</h2>
+      <p class="section-note">SA เปิดเป็น Qty ขาย แสดง<strong>สูงสุด 3 ตำแหน่งเสมอ</strong> — TO/Wave สร้างด้วย conversion จริงของ UOM แต่ละ item เพื่อตัดสต็อกแม่นยำ (อาจมี 3-5 ตำแหน่ง) ดังนั้น TO=9.8235 กับ SA=9.824 ในตัวอย่างเดียวกัน <strong>ถูกต้องแล้วโดยดีไซน์</strong> ไม่ใช่บั๊ก</p>
+      <div class="callout warn">
+        <strong>บั๊กที่เจอจริง (2026-09-06):</strong> ปัดเศษด้วย <code>value.toFixed(3)</code> ตรงๆ ไม่เสถียร — ค่าเดียวกันทางคณิตศาสตร์ให้ผลต่างกันได้ตามที่มาของตัวเลข เช่น <span class="field-chip">9.8235</span> (พิมพ์ตรงๆ) → <code>toFixed(3)</code> ได้ <strong>9.823</strong> (ปัดผิด) แต่ <span class="field-chip">10.4784 − 0.6549</span> (ผลลบ ค่าเท่ากัน) → <code>toFixed(3)</code> ได้ <strong>9.824</strong> (ถูก) — เกิดจาก floating-point ของ JavaScript เก็บทศนิยมไม่เป๊ะที่ตำแหน่งพอดี 5 แล้ว "ปัดสุ่ม" ไปคนละทาง ยืนยันจากผู้ใช้ว่าเจอเคสแบบนี้เป็นปกติ (conversion factor ลงตัวสวยๆ เจอ .xxx5 บ่อย) ไม่ใช่ edge case หายาก
+      </div>
+      <p class="section-note" style="margin-top:14px;">แก้ด้วยฟังก์ชัน <span class="field-chip">roundHalfUp(value, 3)</span> (reparse ผ่าน exponential notation แทนการคูณ/ปัดตรงๆ) ใส่ทั้ง SL และ CS แทนที่ <code>toFixed(3)</code> ทุกจุดที่ใช้คำนวณยอดจริงไปเขียน SA — ทดสอบแล้วให้ผล <strong>9.824</strong> เสมอไม่ว่าที่มาของตัวเลขจะเป็นค่าดิบหรือผลลบ</p>
+    </section>
+
+    <!-- ============ FIELD REFERENCE ============ -->
+    <section id="reference">
+      <div class="kicker">08 — Reference</div>
+      <h2>Field Reference ย่อ</h2>
+      <div class="ref-grid">
+        <div class="ref-card">
+          <h4>Plan Load Item Detail</h4>
+          <ul>
+            <li><span>qty_confirm</span><span class="field-chip">custrecord_item_info_qty_confirm</span></li>
+            <li><span>short_qty_old <em>(ใหม่)</em></span><span class="field-chip field-new">custrecord_item_info_short_qty_old</span></li>
+            <li><span>short whole container</span><span class="field-chip">custrecord_item_info_short_con</span></li>
+            <li><span>container index</span><span class="field-chip">custrecord_item_info_con_index</span></li>
+          </ul>
+        </div>
+        <div class="ref-card">
+          <h4>Wave</h4>
+          <ul>
+            <li><span>Wave Quantity</span><span class="field-chip">custrecord_twms_wavei_wavequantity</span></li>
+            <li><span>Qty Shipped (IF)</span><span class="field-chip">custrecord_twms_wavei_qtyshipped</span></li>
+            <li><span>reason</span><span class="field-chip">custrecord_wms_shortshipment_reason</span></li>
+          </ul>
+        </div>
+        <div class="ref-card">
+          <h4>SA / TO line (ใช้ร่วมกัน)</h4>
+          <ul>
+            <li><span>qty_old</span><span class="field-chip">custcol_shortshipment_qty_old</span></li>
+            <li><span>reason</span><span class="field-chip">custcol_shortshipment_reason</span></li>
+            <li><span>TO closed</span><span class="field-chip">isclosed</span></li>
+          </ul>
+        </div>
+        <div class="ref-card">
+          <h4>Heavy Container</h4>
+          <ul>
+            <li><span>record</span><span class="field-chip">customrecord_heavy_container</span></li>
+            <li><span>container index</span><span class="field-chip">custrecord_hc_container_index</span></li>
+            <li><span>ref SA <em>(ต้องใช้คู่กับ index)</em></span><span class="field-chip field-new">custrecord_hc_ref_sa</span></li>
+            <li><span>scope</span><span>1 แถวต่อ 1 container</span></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="callout warn" style="margin-top:20px;">
+        <strong>บทเรียนจากการทดสอบจริงบน SB1 (2026-09-06):</strong> <span class="field-chip">custrecord_hc_container_index</span> เพียงตัวเดียว<strong>ไม่ unique ข้าม SA</strong> — เจอจริงว่าค่า "2" ซ้ำกัน 338 แถวทั่วทั้งระบบ การค้นหาด้วย index อย่างเดียวครั้งแรกทำให้ไป inactivate Heavy Container ของ shipment อื่นผิด 10 แถวโดยไม่ตั้งใจ (revert คืนหมดแล้ว) ต้องใช้ <span class="field-chip">custrecord_hc_ref_sa</span> กรองคู่กันเสมอถึงจะแม่นยำ — แก้และ verify ซ้ำผ่านแล้วว่ากระทบแค่ 1 แถวที่ถูกต้องเท่านั้น
+      </div>
+      <div class="callout warn" style="margin-top:14px;">
+        <strong>บทเรียนรอบสอง (2026-09-06):</strong> แม้กรอง <span class="field-chip">custrecord_hc_container_index</span> + <span class="field-chip">custrecord_hc_ref_sa</span> คู่กันแล้ว ก็ยังเจอซ้ำได้อีก — ทุกครั้งที่ Plan Load ถูก Re-plan (ตัวเก่า Cancel ตัวใหม่ถูกสร้าง) ระบบภายนอกสร้าง Heavy Container แถวใหม่โดยไม่ inactivate แถวเก่า พบจริง 3 แถว active พร้อมกันสำหรับ container เดียวกัน ต่างกันแค่ <span class="field-chip">custrecord_hc_ref_pl_no</span> (คนละ Plan Load generation) แก้โดย resolve Plan Load header id ปัจจุบันจาก Plan Load Detail id ที่ Client ส่งมา (<span class="field-chip">data-pl-id</span> — id ที่เชื่อถือได้ ไม่ใช่ข้อความคอลัมน์ที่แสดง) แล้วกรองด้วย <span class="field-chip field-new">custrecord_hc_ref_pl_no</span> เป็น filter ที่ 3 — verify แล้วว่ากระทบแค่แถวที่ตรงกับ Plan Load ปัจจุบันจริงเท่านั้น
+      </div>
+      <div class="callout warn" style="margin-top:14px;">
+        <strong>บัคที่ 6 — Plan Load ที่ Cancelled แล้วยังเลือกได้:</strong> Saved search ของ grid Select Data ไม่มี filter <span class="field-chip">isinactive</span> ทำให้ Plan Load Detail ที่ถูก Re-plan/Cancel ไปแล้ว (isinactive=T) ยังโผล่มาให้ติ๊กเลือกซ้ำได้ — เจอจริงบน SA ตัวอย่างที่มี 30 แถว 20 แถวเป็นของเก่าที่ Cancel ไปแล้ว แก้โดยเพิ่ม filter <span class="field-chip field-new">isinactive = F</span> ที่ตัว saved search โดยตรง
+      </div>
+      <div class="callout warn" style="margin-top:14px;">
+        <strong>บัคที่ 8 — TO quantity ถูกเขียนผิดใน Phase B สำหรับ Qty-level:</strong> เดิมโค้ดเขียน TO line <span class="field-chip">quantity</span> ทุกครั้งที่ไม่ใช่ 0 (Qty-level) โดยไม่เช็ค Phase เลย ต่างจาก <span class="field-chip">isclosed</span> ที่เช็คถูกอยู่แล้ว — พอเทส Qty-level กับตู้ที่ Gen IF ไปแล้ว (Phase B) NetSuite reject ด้วย "Transfer orders can not be overfulfilled or overreceived" (TO ไม่เสียหายเพราะ validation ทำงานก่อน commit) แต่พบว่า Plan Load Detail ถูกเขียนบางส่วนไปแล้วทั้งที่ TO ยัง fail — แก้ 2 จุด: (1) เขียน quantity เฉพาะ <span class="field-chip">!isZero && phaseAActive</span> เท่านั้น (2) เพิ่ม flag กัน Plan Load Detail ไม่ให้เขียนถ้า TO section fail ไปก่อนแล้ว — verify ซ้ำผ่านทั้งคู่
+      </div>
+    </section>
+
+    <footer>
+      อ้างอิงเต็มที่ <code>docs/PLAN-cutshort-redesign.md</code> และ <code>CONTEXT.md</code> ใน repo — หน้านี้เป็นภาพสรุปสำหรับทวนความเข้าใจเร็ว ไม่ใช่ spec ทางการ
+    </footer>
+  </main>
+</div>

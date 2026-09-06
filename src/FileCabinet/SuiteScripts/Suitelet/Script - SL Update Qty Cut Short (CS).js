@@ -33,6 +33,21 @@ MODULE.push('SuiteScripts/Library/Libraries Code 2.0.220622.js');
 // ################################################################################################
 var timer = new Date().getTime();
 
+// Round-half-up to `d` decimals via exponential-notation reparse — NOT the same as
+// `value.toFixed(d)`. Binary floating point can't represent most decimals exactly, so a value
+// that's mathematically exactly on a rounding boundary (e.g. 9.8235 at 3dp) may already be
+// stored as 9.82349999999999923 or 9.82350000000000101 depending on how it was produced
+// (literal parse vs. subtraction) — `toFixed` rounds whichever binary value it actually got, so
+// the SAME real-world quantity can display/write as 9.823 or 9.824 depending on arithmetic path.
+// Confirmed with the user 2026-09-06: this happens routinely (clean per-unit conversion factors
+// land exactly on a .xxx5 boundary often) and the correct SA value is always the true
+// round-half-up result, not whatever toFixed happens to produce.
+function roundHalfUp(value, d) {
+	var n = Number(value);
+	if (isNaN(n)) return n;
+	return Number(Math.round(Number(n + 'e' + d)) + 'e-' + d);
+}
+
 define(MODULE,
 	/**
 	 * @param {currentRecord} _nlCurrentRecord
@@ -279,7 +294,7 @@ function PageInit(scriptContext, currentRecord, mode) {
 				sum += qsv;
 			});
 			// Smart 3-decimal: integer → bare; decimal → fix to 3 (keep trailing zeros)
-			sum = parseFloat(sum.toFixed(3));
+			sum = roundHalfUp(sum, 3);
 			var sumDisp = (sum === Math.floor(sum)) ? String(sum) : sum.toFixed(3);
 			$itemRow.find('.item-qty-shipped').text(sumDisp);
 		}
@@ -692,6 +707,10 @@ function UI_startProcess() {
 		var conDonePls = {};     // conIndex → how many of those have completed (success or fail)
 		var conSuccessPls = {};  // conIndex → how many of those succeeded
 		var conSaid = {};        // conIndex → an SA id to use on the close_heavy_container call
+		var conPlanLoadDetailId = {};  // conIndex → a Plan Load Item Detail record id (data-pl-id) belonging
+		                               // to this container/run — server resolves its parent Plan Load id
+		                               // from this (reliable internal id), not from any displayed column
+		                               // text/index (disambiguates re-planned Heavy Container dupes).
 		// Per-PL success tracking (save_sa_body partial-failure fix — Reliability fix #3)
 		var plResultOk = {};     // planLoadId → true/false (only set once its process_pl call returns)
 		for (var i = 0; i < payload.length; i++) {
@@ -725,6 +744,7 @@ function UI_startProcess() {
 					conDonePls[pConIndex] = conDonePls[pConIndex] || 0;
 					conSuccessPls[pConIndex] = conSuccessPls[pConIndex] || 0;
 					if (!conSaid[pConIndex]) conSaid[pConIndex] = e.said;
+					if (!conPlanLoadDetailId[pConIndex]) conPlanLoadDetailId[pConIndex] = p.planLoadId;
 				}
 			}
 		}
@@ -835,18 +855,19 @@ function UI_startProcess() {
 				var plk = pls[k];
 				total += parseFloat(plk.effectiveQty) || 0;
 			}
-			total = parseFloat(total.toFixed(3));
+			total = roundHalfUp(total, 3);
 			return (total === Math.floor(total)) ? String(total) : total.toFixed(3);
 		}
 
 		// Fire close_heavy_container for ONE container — only ever called after every selected
 		// pl-row sharing that Container Index has succeeded in process_pl (see call site below).
-		function fireCloseHeavyContainer(conIndex, saidForCall) {
+		function fireCloseHeavyContainer(conIndex, saidForCall, planLoadDetailIdForCall) {
 			var postParams = jQuery.extend({}, nsTokens, {
 				step: 'ajaxsync',
 				action: 'close_heavy_container',
 				said: saidForCall || '',
 				conIndex: conIndex,
+				planLoadDetailId: planLoadDetailIdForCall || '',
 			});
 			jQuery.post(ajaxUrl, postParams).done(function (resp) {
 				var data = parseAjaxResponse(resp);
@@ -933,7 +954,7 @@ function UI_startProcess() {
 						if (succeeded) conSuccessPls[plConIndex] = (conSuccessPls[plConIndex] || 0) + 1;
 						if (conDonePls[plConIndex] === conTotalPls[plConIndex]) {
 							if (conSuccessPls[plConIndex] === conTotalPls[plConIndex]) {
-								fireCloseHeavyContainer(plConIndex, conSaid[plConIndex]);
+								fireCloseHeavyContainer(plConIndex, conSaid[plConIndex], conPlanLoadDetailId[plConIndex]);
 							} else {
 								console.warn('[heavycontainer] container ' + plConIndex + ' had 1+ failed rows — Heavy Container NOT inactivated this run (re-run to retry)');
 							}

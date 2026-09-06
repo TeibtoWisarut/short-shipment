@@ -45,6 +45,21 @@ var DisplayType = {
 	INLINE: {displayType: 'INLINE'},
 };
 
+// Round-half-up to `d` decimals via exponential-notation reparse — NOT the same as
+// `value.toFixed(d)`. Binary floating point can't represent most decimals exactly, so a value
+// that's mathematically exactly on a rounding boundary (e.g. 9.8235 at 3dp) may already be
+// stored as 9.82349999999999923 or 9.82350000000000101 depending on how it was produced
+// (literal parse vs. subtraction) — `toFixed` rounds whichever binary value it actually got,
+// so the SAME real-world quantity can display as 9.823 or 9.824 depending on arithmetic path.
+// Confirmed with the user 2026-09-06: this is common in practice (clean per-unit conversion
+// factors like 0.6549/pallet land exactly on a .xxx5 boundary often) and the correct SA value
+// is always the true round-half-up result (9.824), not whatever toFixed happens to produce.
+function roundHalfUp(value, d) {
+	var n = Number(value);
+	if (isNaN(n)) return n;
+	return Number(Math.round(Number(n + 'e' + d)) + 'e-' + d);
+}
+
 // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 // ########## Main Suitelet Function
@@ -207,6 +222,7 @@ function OnRequest(context, request, response) {
 		if (saIdList.length > 0) {
 			ss_pl = libCode.loadSavedSearch(null, 'customsearch_ss_pl_short_order_line', [
 				{name: 'custrecord_item_info_sa_no_ex', operator: search.Operator.ANYOF, values: saIdList},
+				{name: 'isinactive', operator: search.Operator.IS, values: false},
 			], null);
 
             log.debug('customsearch_ss_pl_short_order_line', { ss_length: ss_pl.length, ssFilters: saIdList });
@@ -566,7 +582,7 @@ function OnRequest(context, request, response) {
 						sumQtyShipped += (parseFloat(qsv) || 0);
 					}
 					// Smart 3-decimal display: integer → bare number; decimal → fix to 3 (keep trailing zeros)
-					var sumQtyShippedRounded = parseFloat(sumQtyShipped.toFixed(3));
+					var sumQtyShippedRounded = roundHalfUp(sumQtyShipped, 3);
 					var sumQtyShippedDisp = (sumQtyShippedRounded === Math.floor(sumQtyShippedRounded))
 						? String(sumQtyShippedRounded)
 						: sumQtyShippedRounded.toFixed(3);
@@ -892,7 +908,7 @@ function OnRequest(context, request, response) {
 					if (isNaN(itTotalQs)) {
 						itTotalQsFmt = it.totalQtyShippedDisp;
 					} else {
-						var itTotalQsRounded = parseFloat(itTotalQs.toFixed(3));
+						var itTotalQsRounded = roundHalfUp(itTotalQs, 3);
 						itTotalQsFmt = (itTotalQsRounded === Math.floor(itTotalQsRounded))
 							? String(itTotalQsRounded)
 							: itTotalQsRounded.toFixed(3);
@@ -1163,6 +1179,7 @@ function OnRequest(context, request, response) {
 				}
 
 				// ---- (a) TO line — load + match + save (retry-on-collision wrapped)
+				var toSectionOk = true;
 				try {
 					withRetryOnCollision(function () {
 						log.audit({title: 'usage: before TO load', details: 'toId=' + pl.toId + ' remaining=' + runtime.getCurrentScript().getRemainingUsage()});
@@ -1192,6 +1209,7 @@ function OnRequest(context, request, response) {
 						}
 
 						if (lineIdx < 0) {
+							toSectionOk = false;
 							failed.push({type: 'TO', id: pl.toId, planLoadId: pl.planLoadId, line: pl.toLineId, msg: 'Line not found (PL ' + pl.planLoadId + ')'});
 							return;
 						}
@@ -1214,12 +1232,16 @@ function OnRequest(context, request, response) {
 						}
 
 						if (setIfDiff(toRec, 'item', 'custcol_shortshipment_reason', lineIdx, reason)) toChanged = true;
-						// Qty-level ONLY: write the new (non-zero) quantity. NetSuite hard-rejects
+						// Qty-level, Phase A ONLY: write the new (non-zero) quantity. NetSuite hard-rejects
 						// quantity=0 on a Transfer Order line ("must have a positive count", confirmed
 						// empirically) — for isZero rows the line must be CLOSED instead (below), never
 						// have its quantity touched at all; whatever value is already there becomes moot
-						// once the line is closed.
-						if (!isZero) {
+						// once the line is closed. Phase B must NEVER touch quantity regardless of
+						// isZero — the TO already finished its lifecycle via IF/IR, so lowering quantity
+						// below what was already fulfilled/received is rejected by NetSuite itself
+						// ("Transfer orders can not be overfulfilled or overreceived", confirmed live
+						// 2026-09-06 testing a Qty-level short on an already-fulfilled TO line).
+						if (!isZero && phaseAActive) {
 							if (setIfDiff(toRec, 'item', 'quantity', lineIdx, effectiveQty)) toChanged = true;
 						}
 
@@ -1250,12 +1272,18 @@ function OnRequest(context, request, response) {
 						}
 					});
 				} catch (e) {
+					toSectionOk = false;
 					log.error({title: 'TO load/update fail', details: 'id=' + pl.toId + ' :: ' + (e.message || String(e))});
 					failed.push({type: 'TO', id: pl.toId, planLoadId: pl.planLoadId, msg: e.message || String(e)});
 				}
 
-				// ---- (a-2) Plan/Load record — submitFields (fast)
-				if (pl.planLoadId) {
+				// ---- (a-2) Plan/Load record — submitFields (fast). Skipped entirely if the TO
+				// section above failed — writing PL Detail fields (isinactive/short_qty_old/reason)
+				// while the paired TO update never landed would leave an inconsistent partial state
+				// that the UI reports as a row failure while the DB shows it half-done (found live
+				// 2026-09-06 via the TO overfulfillment bug above: PL got stamped even though the TO
+				// save threw before it ever committed).
+				if (pl.planLoadId && toSectionOk) {
 					try {
 						var newShortCon = shortConFlag;
 						var plValues = {
@@ -1442,6 +1470,7 @@ function OnRequest(context, request, response) {
 			// ============================================================
 			if (action === 'close_heavy_container') {
 				var conIndex = params.conIndex;
+				var planLoadDetailId = params.planLoadDetailId;
 				try {
 					if (conIndex == null || String(conIndex).trim() === '') {
 						response.setHeader({name: 'Content-Type', value: 'application/json'});
@@ -1455,12 +1484,38 @@ function OnRequest(context, request, response) {
 					// (the SA this Heavy Container row belongs to) or this can inactivate a completely
 					// unrelated shipment's Heavy Container row. (Real incident 2026-09-06: without this
 					// filter, 10 unrelated rows got wrongly inactivated in one call — reverted by hand.)
+					// A THIRD filter, custrecord_hc_ref_pl_no, is also required: every time a Plan Load
+					// is re-planned (old one Cancelled, new one created), the external process creates a
+					// new Heavy Container row for the same container index WITHOUT inactivating the old
+					// one — so container_index + ref_sa alone can still match multiple stale rows from
+					// earlier re-plan generations (confirmed live on SA 2819679, container index 1: 3
+					// active rows, only the one matching the CURRENT Plan Load id was correct). Resolve
+					// the current Plan Load header id server-side from the Plan Load Item Detail id the
+					// client sends (data-pl-id — a reliable internal id, unlike any displayed column
+					// text/index) rather than trusting a client-parsed display value.
+					var hcFilters = [
+						['custrecord_hc_container_index', 'is', conIndex], 'AND',
+						['custrecord_hc_ref_sa', 'anyof', said],
+					];
+					if (planLoadDetailId != null && String(planLoadDetailId).trim() !== '') {
+						try {
+							var plLookup = search.lookupFields({
+								type: 'customrecord_exp_item_information_pl',
+								id: planLoadDetailId,
+								columns: ['custrecord_item_info_plan_load'],
+							});
+							var plHeaderRef = plLookup.custrecord_item_info_plan_load;
+							var plHeaderId = (plHeaderRef && plHeaderRef.length > 0) ? plHeaderRef[0].value : null;
+							if (plHeaderId) {
+								hcFilters.push('AND', ['custrecord_hc_ref_pl_no', 'anyof', plHeaderId]);
+							}
+						} catch (eLookup) {
+							log.error({title: 'close_heavy_container: Plan Load lookup failed', details: 'planLoadDetailId=' + planLoadDetailId + ' :: ' + (eLookup.message || String(eLookup))});
+						}
+					}
 					var hcResults = search.create({
 						type: 'customrecord_heavy_container',
-						filters: [
-							['custrecord_hc_container_index', 'is', conIndex], 'AND',
-							['custrecord_hc_ref_sa', 'anyof', said],
-						],
+						filters: hcFilters,
 						columns: [search.createColumn({name: 'internalid'})],
 					}).run().getRange({start: 0, end: 10});
 
