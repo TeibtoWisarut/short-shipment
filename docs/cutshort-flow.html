@@ -185,9 +185,9 @@
 
   <main>
     <header class="hero">
-      <span class="eyebrow">● Internal reference — ShortShipment · deployed to SB1, qty_confirm change pending re-test</span>
+      <span class="eyebrow">● Internal reference — ShortShipment · live on Production since 2026-09-07</span>
       <h1 class="title">Cut Short Flow</h1>
-      <p>แผนผังการทำงานทั้งหมดของเครื่องมือ <em>Update Qty Cut Short</em> — ตั้งแต่ process chain ของ Export, จุดแบ่ง Phase A/B, จนถึง write-set ที่แม่นยำของทั้ง 3 ระดับ short (Qty / Line / Container) กลับมาเปิดหน้านี้เพื่อทวนภาพรวมได้ทันทีโดยไม่ต้องไล่อ่าน Plan doc ใหม่ — ณ 2026-09-06 ผ่านการทดสอบจริงบน SB1 ครบทั้ง 3 ระดับ × 2 Phase แล้ว (พบและแก้บั๊กจริงรวม 8 จุดระหว่างทาง) ต่อมา 2026-09-07 เพิ่มการเขียน <span class="field-chip">custrecord_item_info_qty_confirm</span> ในเคส Qty-level (issue #1, deploy ขึ้น SB1 แล้ว — ยังไม่ผ่านการทดสอบซ้ำ)</p>
+      <p>แผนผังการทำงานทั้งหมดของเครื่องมือ <em>Update Qty Cut Short</em> — ตั้งแต่ process chain ของ Export, จุดแบ่ง Phase A/B, จนถึง write-set ที่แม่นยำของทั้ง 3 ระดับ short (Qty / Line / Container) กลับมาเปิดหน้านี้เพื่อทวนภาพรวมได้ทันทีโดยไม่ต้องไล่อ่าน Plan doc ใหม่ — ณ 2026-09-06 ผ่านการทดสอบจริงบน SB1 ครบทั้ง 3 ระดับ × 2 Phase แล้ว (พบและแก้บั๊กจริงรวม 8 จุดระหว่างทาง) ต่อมา 2026-09-07 เพิ่มการเขียน <span class="field-chip">custrecord_item_info_qty_confirm</span> ในเคส Qty-level (issue #1) — ทดสอบผ่านบน SB1 ด้วย SA จริง (SAE-PK-TH-DA-26070005) แล้ว <strong>deploy ขึ้น Production สำเร็จเมื่อ 2026-09-07</strong> (เป็นการ go-live ครั้งแรกของ redesign ทั้งชุด เพราะ Prod ยังไม่เคยได้รับ deploy นี้มาก่อนเลย — ดู backup ก่อน deploy ที่ <code>backups/prod_2026-09-07/</code>)</p>
     </header>
 
     <!-- ============ PROCESS CHAIN ============ -->
@@ -628,6 +628,9 @@
       </div>
       <div class="callout" style="margin-top:14px;">
         <strong>การเปลี่ยนแปลง 9 — เปิดให้เขียน qty_confirm เฉพาะเคส Qty-level (2026-09-07, issue #1):</strong> เดิม <span class="field-chip">custrecord_item_info_qty_confirm</span> ห้ามเขียนทับเด็ดขาดทุกเคส (ดูบั๊กเดิมใน §02) ทีมตัดสินใจเปลี่ยนให้เคส Qty-level เขียนทับด้วย <code>effectiveQty</code> ได้ (Line-level/Container-level ยังคงห้ามแตะเหมือนเดิม) เพื่อให้ค่านี้สะท้อน wave qty ล่าสุดหลัง short — แลกกับความเสี่ยงที่ flow Cancel Wave + Confirm ใหม่ในอนาคตจะ regenerate จากยอดที่ short แล้วแทนยอดแผนเดิม (ยอมรับความเสี่ยงนี้แล้ว) ยอดแผนดั้งเดิมจริงยังกู้คืนได้จาก <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> ซึ่ง stamp ไว้ก่อนเขียนทับเสมอ
+      </div>
+      <div class="callout" style="margin-top:14px;">
+        <strong>Production go-live (2026-09-07):</strong> deploy ทั้ง redesign ขึ้น Production เป็นครั้งแรก — ก่อนหน้านี้ Prod ยังรันโค้ดเวอร์ชันก่อน redesign อยู่ (ไม่เคยได้รับ deploy ตั้งแต่เริ่มงานนี้) การ deploy รอบนี้จึงรวม 3-level write-set, Phase A/B logic, Heavy Container scoping/dedup fixes, และ qty_confirm fix (การเปลี่ยนแปลง 9) เข้าไปพร้อมกันทั้งหมด ยืนยันด้วย SHA-256 hash-verify ว่าไฟล์บน Prod ตรงกับ source 100% — backup ของโค้ด Prod ก่อน deploy เก็บไว้ที่ <code>backups/prod_2026-09-07/</code>
       </div>
     </section>
 
