@@ -1289,13 +1289,20 @@ function OnRequest(context, request, response) {
 						var plValues = {
 							custrecord_pl_shortshipment_reason: reason,
 							custrecord_item_info_short_con: newShortCon,
-							// custrecord_item_info_qty_confirm: NEVER written — original plan qty must
-							// survive forever (Wave regeneration on Cancel Wave + Confirm relies on it).
 						};
 						var plNwNum = parseFloat(pl.netWeight);
 						var plGwNum = parseFloat(pl.grossWeight);
 						if (!isNaN(plNwNum)) plValues.custrecord_item_info_net_weight = plNwNum;
 						if (!isNaN(plGwNum)) plValues.custrecord_item_info_gross_weight = plGwNum;
+
+						// Qty-level only (!isZero): overwrite custrecord_item_info_qty_confirm with
+						// effectiveQty (already phase-split: Phase A = Wave Quantity, Phase B = Qty
+						// Shipped — see effectiveQty computation above). This is now the ONLY field
+						// still holding the true original plan qty; the short_qty_old lookup below
+						// must run in this same submitFields call to capture it before this overwrite.
+						if (!isZero) {
+							plValues.custrecord_item_info_qty_confirm = effectiveQty;
+						}
 
 						// Qty Old preservation (custrecord_item_info_short_qty_old) — stamp ONLY on first
 						// change, mirroring custcol_shortshipment_qty_old: preserve the original

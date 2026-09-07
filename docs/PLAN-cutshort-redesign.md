@@ -27,7 +27,7 @@ TO/SA จริง, field `qty_confirm` บน Plan Load ถูกเขีย�
 ## 3. Fix ส่วนที่ 1 — Read-side (แก้แหล่งข้อมูล Qty Shipped)
 
 1. เปลี่ยน fallback chain: `qtyshipped ?? qty_confirm` → **`qtyshipped ?? wavequantity`**
-2. **หยุดเขียนทับ** `custrecord_item_info_qty_confirm` บน Plan Load Item Detail ใน `process_pl` (ปัจจุบันเขียนทุกครั้ง) — field นี้ต้องคงยอดแผนดั้งเดิมตลอดไป เพราะ Wave/TO ใช้ field นี้เป็นต้นทางตอน Regenerate (Cancel Wave + Confirm ใหม่)
+2. **หยุดเขียนทับแบบไม่มีเงื่อนไข** `custrecord_item_info_qty_confirm` บน Plan Load Item Detail ใน `process_pl` (ปัญหาเดิม: เขียนทุกครั้งไม่ว่ากรณีไหน) — เปลี่ยนเป็นเขียนเฉพาะเคส **Qty-level** ด้วยค่า `effectiveQty` (ดู §4) ส่วน Line-level/Container-level ยังคงไม่แตะเหมือนเดิม (**อัปเดต 2026-09-07 / issue #1**: เดิมแผนคือ "ห้ามเขียนทับเด็ดขาด" ทุกกรณี แต่ทีมตัดสินใจยอมรับความเสี่ยงต่อ Wave regeneration flow — ดู §4 และ `CONTEXT.md` §Qty Confirm)
 3. แยกคอลัมน์ Level-3 (Plan/Load row) จาก "Qty Shipped" 1 คอลัมน์ → **2 คอลัมน์**: **"Wave Qty"** (ดิบจาก `wavequantity`) + **"Qty Shipped (IF)"** (ดิบจาก `qtyshipped`, ว่าง = ยังไม่ Gen IF) — คอลัมน์ว่าง/ไม่ว่างทำหน้าที่บอก Phase A/B โดยอัตโนมัติ ไม่ต้องเพิ่ม badge แยก
 4. เพิ่ม **soft warning** (ไม่ block) เมื่อ Reason ที่เลือกไม่ตรงกับ Phase ที่ตรวจพบของ container นั้น — เช็ค **live ทันทีที่เปลี่ยน Reason dropdown** (client-side, ใช้ mapping table เล็กๆ ด้านล่าง)
 
@@ -54,7 +54,7 @@ Checkbox "Short whole container" **ไม่มีผลต่อการคำ
 | SA line | `custcol_shortshipment_qty_old` | stamp ครั้งแรกที่เปลี่ยน (ของเดิมมีอยู่แล้ว) |
 | Plan Load Item Detail | reason | เขียน |
 | Plan Load Item Detail | `custrecord_item_info_short_qty_old` (**field ใหม่**) | stamp ครั้งแรกที่เปลี่ยน |
-| Plan Load Item Detail | `custrecord_item_info_qty_confirm` | **ห้ามเขียนทับเด็ดขาด** |
+| Plan Load Item Detail | `custrecord_item_info_qty_confirm` | เขียนด้วย `effectiveQty` (Phase A = Wave Quantity, Phase B = Qty Shipped) — **อัปเดต 2026-09-07**: เดิมห้ามเขียนทับเด็ดขาด, ดูหมายเหตุความเสี่ยงใน §3 ข้อ 2 |
 | Plan Load Item Detail | `isinactive` | ไม่แตะ |
 | TO line | `quantity`, reason | ปรับเป็นยอดใหม่ |
 | TO line | `custcol_shortshipment_qty_old` | stamp ครั้งแรกที่เปลี่ยน |
