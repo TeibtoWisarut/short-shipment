@@ -185,9 +185,9 @@
 
   <main>
     <header class="hero">
-      <span class="eyebrow">● Internal reference — ShortShipment · SB1 tested, all cases pass</span>
+      <span class="eyebrow">● Internal reference — ShortShipment · deployed to SB1, qty_confirm change pending re-test</span>
       <h1 class="title">Cut Short Flow</h1>
-      <p>แผนผังการทำงานทั้งหมดของเครื่องมือ <em>Update Qty Cut Short</em> — ตั้งแต่ process chain ของ Export, จุดแบ่ง Phase A/B, จนถึง write-set ที่แม่นยำของทั้ง 3 ระดับ short (Qty / Line / Container) กลับมาเปิดหน้านี้เพื่อทวนภาพรวมได้ทันทีโดยไม่ต้องไล่อ่าน Plan doc ใหม่ — ณ 2026-09-06 ผ่านการทดสอบจริงบน SB1 ครบทั้ง 3 ระดับ × 2 Phase แล้ว (พบและแก้บั๊กจริงรวม 8 จุดระหว่างทาง)</p>
+      <p>แผนผังการทำงานทั้งหมดของเครื่องมือ <em>Update Qty Cut Short</em> — ตั้งแต่ process chain ของ Export, จุดแบ่ง Phase A/B, จนถึง write-set ที่แม่นยำของทั้ง 3 ระดับ short (Qty / Line / Container) กลับมาเปิดหน้านี้เพื่อทวนภาพรวมได้ทันทีโดยไม่ต้องไล่อ่าน Plan doc ใหม่ — ณ 2026-09-06 ผ่านการทดสอบจริงบน SB1 ครบทั้ง 3 ระดับ × 2 Phase แล้ว (พบและแก้บั๊กจริงรวม 8 จุดระหว่างทาง) ต่อมา 2026-09-07 เพิ่มการเขียน <span class="field-chip">custrecord_item_info_qty_confirm</span> ในเคส Qty-level (issue #1, deploy ขึ้น SB1 แล้ว — ยังไม่ผ่านการทดสอบซ้ำ)</p>
     </header>
 
     <!-- ============ PROCESS CHAIN ============ -->
@@ -356,7 +356,7 @@
             <tr class="rowgrp-a">
               <th>Qty-level · Phase A</th>
               <td class="center">qty + qty_old + reason <span class="yes">✓</span></td>
-              <td class="center">reason + short_qty_old <span class="yes">✓</span></td>
+              <td class="center">reason + short_qty_old + <strong>qty_confirm</strong> (= Wave Quantity) <span class="yes">✓</span></td>
               <td class="center no">–</td>
               <td class="center">qty + qty_old + reason <span class="yes">✓</span></td>
               <td class="center">reason <span class="yes">✓</span></td>
@@ -365,7 +365,7 @@
             <tr class="rowgrp-b">
               <th>Qty-level · Phase B</th>
               <td class="center">qty + qty_old + reason <span class="yes">✓</span></td>
-              <td class="center">reason + short_qty_old <span class="yes">✓</span></td>
+              <td class="center">reason + short_qty_old + <strong>qty_confirm</strong> (= Qty Shipped) <span class="yes">✓</span></td>
               <td class="center no">–</td>
               <td class="center">qty_old + reason <span class="yes">✓</span> — <strong>ไม่แตะ quantity</strong></td>
               <td class="center">reason <span class="yes">✓</span></td>
@@ -410,7 +410,7 @@
           </tbody>
         </table>
       </div>
-      <div class="callout warn"><strong>กฎตายตัวทุกเคส:</strong> <span class="field-chip">custrecord_item_info_qty_confirm</span> บน Plan Load Detail — <strong>ห้ามเขียนทับเด็ดขาด</strong> เก็บยอดแผนดั้งเดิมไว้เสมอ ใช้ตอน Regenerate Wave/TO (Cancel + Confirm ใหม่)</div>
+      <div class="callout warn"><strong>อัปเดต 2026-09-07 (issue #1):</strong> <span class="field-chip">custrecord_item_info_qty_confirm</span> บน Plan Load Detail — เดิม<strong>ห้ามเขียนทับเด็ดขาด</strong>ทุกเคส ตอนนี้เปลี่ยนแล้ว: เขียนทับด้วย <code>effectiveQty</code> เฉพาะเคส <strong>Qty-level</strong> เท่านั้น (Line-level/Container-level ยังคงห้ามแตะเหมือนเดิม) ยอดแผนดั้งเดิมจริงย้ายไปเก็บที่ <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> แทน — ยอมรับความเสี่ยงว่า Regenerate Wave/TO (Cancel + Confirm ใหม่) ของแถวที่เคย Qty-level short จะได้ยอดที่ short แล้วเป็นฐาน ไม่ใช่ยอดแผนเดิม</div>
     </section>
 
     <!-- ============ CASE DETAILS ============ -->
@@ -432,6 +432,7 @@
               <ul>
                 <li>SA line: <span class="field-chip">quantity</span>, <span class="field-chip">custcol_shortshipment_qty_old</span> (ครั้งแรกที่เปลี่ยน), reason</li>
                 <li>Plan Load Detail: <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> (ใหม่), reason</li>
+                <li>Plan Load Detail: <span class="field-chip field-new">custrecord_item_info_qty_confirm</span> = <code>effectiveQty</code> (Phase A = Wave Quantity, Phase B = Qty Shipped) — <strong>อัปเดต 2026-09-07 / issue #1</strong>, เดิมห้ามเขียนทับ ดูหมายเหตุความเสี่ยงด้านล่าง</li>
                 <li>TO line: <span class="field-chip">quantity</span>, <span class="field-chip">custcol_shortshipment_qty_old</span>, reason</li>
                 <li>Wave: reason (+ conv/NW/GW ถ้าติ๊ก "Do not Cal Conv" — ของเดิม ไม่เปลี่ยน)</li>
               </ul>
@@ -439,12 +440,14 @@
             <div>
               <h4>ไม่แตะอะไร</h4>
               <ul>
-                <li><span class="field-chip">custrecord_item_info_qty_confirm</span> — ห้ามเขียนทับ</li>
                 <li><span class="field-chip">isinactive</span> บน Plan Load Detail</li>
                 <li><span class="field-chip">isclosed</span> บน TO line</li>
                 <li>Heavy Container</li>
               </ul>
             </div>
+          </div>
+          <div class="callout warn">
+            <strong>ความเสี่ยงที่ยอมรับแล้ว:</strong> หลังจากนี้ <span class="field-chip">custrecord_item_info_qty_confirm</span> ของแถวที่เคยถูก Qty-level short จะไม่ใช่ยอดแผนดั้งเดิมอีกต่อไป — ถ้ามีคน Cancel Wave + Confirm ใหม่ (Regenerate) ในอนาคต ระบบจะได้ยอดที่ short ไปแล้วเป็นฐานแทนยอดแผนเดิม ยอดแผนดั้งเดิมจริงต้องไปดูที่ <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> แทน
           </div>
         </div>
       </details>
@@ -578,7 +581,7 @@
         <div class="ref-card">
           <h4>Plan Load Item Detail</h4>
           <ul>
-            <li><span>qty_confirm</span><span class="field-chip">custrecord_item_info_qty_confirm</span></li>
+            <li><span>qty_confirm <em>(เขียนได้แล้ว — Qty-level เท่านั้น)</em></span><span class="field-chip">custrecord_item_info_qty_confirm</span></li>
             <li><span>short_qty_old <em>(ใหม่)</em></span><span class="field-chip field-new">custrecord_item_info_short_qty_old</span></li>
             <li><span>short whole container</span><span class="field-chip">custrecord_item_info_short_con</span></li>
             <li><span>container index</span><span class="field-chip">custrecord_item_info_con_index</span></li>
@@ -622,6 +625,9 @@
       </div>
       <div class="callout warn" style="margin-top:14px;">
         <strong>บัคที่ 8 — TO quantity ถูกเขียนผิดใน Phase B สำหรับ Qty-level:</strong> เดิมโค้ดเขียน TO line <span class="field-chip">quantity</span> ทุกครั้งที่ไม่ใช่ 0 (Qty-level) โดยไม่เช็ค Phase เลย ต่างจาก <span class="field-chip">isclosed</span> ที่เช็คถูกอยู่แล้ว — พอเทส Qty-level กับตู้ที่ Gen IF ไปแล้ว (Phase B) NetSuite reject ด้วย "Transfer orders can not be overfulfilled or overreceived" (TO ไม่เสียหายเพราะ validation ทำงานก่อน commit) แต่พบว่า Plan Load Detail ถูกเขียนบางส่วนไปแล้วทั้งที่ TO ยัง fail — แก้ 2 จุด: (1) เขียน quantity เฉพาะ <span class="field-chip">!isZero && phaseAActive</span> เท่านั้น (2) เพิ่ม flag กัน Plan Load Detail ไม่ให้เขียนถ้า TO section fail ไปก่อนแล้ว — verify ซ้ำผ่านทั้งคู่
+      </div>
+      <div class="callout" style="margin-top:14px;">
+        <strong>การเปลี่ยนแปลง 9 — เปิดให้เขียน qty_confirm เฉพาะเคส Qty-level (2026-09-07, issue #1):</strong> เดิม <span class="field-chip">custrecord_item_info_qty_confirm</span> ห้ามเขียนทับเด็ดขาดทุกเคส (ดูบั๊กเดิมใน §02) ทีมตัดสินใจเปลี่ยนให้เคส Qty-level เขียนทับด้วย <code>effectiveQty</code> ได้ (Line-level/Container-level ยังคงห้ามแตะเหมือนเดิม) เพื่อให้ค่านี้สะท้อน wave qty ล่าสุดหลัง short — แลกกับความเสี่ยงที่ flow Cancel Wave + Confirm ใหม่ในอนาคตจะ regenerate จากยอดที่ short แล้วแทนยอดแผนเดิม (ยอมรับความเสี่ยงนี้แล้ว) ยอดแผนดั้งเดิมจริงยังกู้คืนได้จาก <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> ซึ่ง stamp ไว้ก่อนเขียนทับเสมอ
       </div>
     </section>
 
