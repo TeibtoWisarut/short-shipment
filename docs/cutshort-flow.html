@@ -411,11 +411,7 @@
           </tbody>
         </table>
       </div>
-<<<<<<< HEAD
-      <div class="callout warn"><strong>อัปเดต 2026-09-07 (issue #1):</strong> <span class="field-chip">custrecord_item_info_qty_confirm</span> บน Plan Load Detail — เดิม<strong>ห้ามเขียนทับเด็ดขาด</strong>ทุกเคส ตอนนี้เปลี่ยนแล้ว: เขียนทับด้วย <code>effectiveQty</code> เฉพาะเคส <strong>Qty-level</strong> เท่านั้น (Line-level/Container-level ยังคงห้ามแตะเหมือนเดิม) ยอดแผนดั้งเดิมจริงย้ายไปเก็บที่ <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> แทน — ยอมรับความเสี่ยงว่า Regenerate Wave/TO (Cancel + Confirm ใหม่) ของแถวที่เคย Qty-level short จะได้ยอดที่ short แล้วเป็นฐาน ไม่ใช่ยอดแผนเดิม</div>
-=======
-      <div class="callout warn"><strong>กฎ qty_confirm (แก้ไข 2026-09-24):</strong> Qty-level short <strong>เขียนทับ</strong> <span class="field-chip">custrecord_item_info_qty_confirm</span> ด้วยยอดใหม่ เพราะเอกสาร Container List ดึงค่านี้ไปแสดง — ยอดแผนดั้งเดิมถูกเก็บไว้ที่ <span class="field-chip">custrecord_item_info_short_qty_old</span> (stamp ครั้งแรกก่อนเขียนทับ) ส่วน Line/Container-level ไม่เขียนทับ</div>
->>>>>>> 7e4412b (Add Load Status warning, adopt Prod qty_confirm overwrite, lock Preview short-con)
+      <div class="callout warn"><strong>อัปเดต 2026-09-07 (issue #1):</strong> <span class="field-chip">custrecord_item_info_qty_confirm</span> บน Plan Load Detail — เดิม<strong>ห้ามเขียนทับเด็ดขาด</strong>ทุกเคส ตอนนี้เปลี่ยนแล้ว: เขียนทับด้วย <code>effectiveQty</code> เฉพาะเคส <strong>Qty-level</strong> เท่านั้น (Line-level/Container-level ยังคงห้ามแตะเหมือนเดิม) ยอดแผนดั้งเดิมจริงย้ายไปเก็บที่ <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> แทน — เหตุผล: เอกสาร Container List ดึง <span class="field-chip">qty_confirm</span> ไปแสดง — ยอมรับความเสี่ยงว่า Regenerate Wave/TO (Cancel + Confirm ใหม่) ของแถวที่เคย Qty-level short จะได้ยอดที่ short แล้วเป็นฐาน ไม่ใช่ยอดแผนเดิม</div>
     </section>
 
     <!-- ============ CASE DETAILS ============ -->
@@ -436,12 +432,8 @@
               <h4>เขียนอะไร</h4>
               <ul>
                 <li>SA line: <span class="field-chip">quantity</span>, <span class="field-chip">custcol_shortshipment_qty_old</span> (ครั้งแรกที่เปลี่ยน), reason</li>
-<<<<<<< HEAD
                 <li>Plan Load Detail: <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> (ใหม่), reason</li>
                 <li>Plan Load Detail: <span class="field-chip field-new">custrecord_item_info_qty_confirm</span> = <code>effectiveQty</code> (Phase A = Wave Quantity, Phase B = Qty Shipped) — <strong>อัปเดต 2026-09-07 / issue #1</strong>, เดิมห้ามเขียนทับ ดูหมายเหตุความเสี่ยงด้านล่าง</li>
-=======
-                <li>Plan Load Detail: <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> (ใหม่), reason, <span class="field-chip">custrecord_item_info_qty_confirm</span> = ยอดใหม่ (ใช้แสดงใน Container List)</li>
->>>>>>> 7e4412b (Add Load Status warning, adopt Prod qty_confirm overwrite, lock Preview short-con)
                 <li>TO line: <span class="field-chip">quantity</span>, <span class="field-chip">custcol_shortshipment_qty_old</span>, reason</li>
                 <li>Wave: reason (+ conv/NW/GW ถ้าติ๊ก "Do not Cal Conv" — ของเดิม ไม่เปลี่ยน)</li>
               </ul>
@@ -449,10 +441,6 @@
             <div>
               <h4>ไม่แตะอะไร</h4>
               <ul>
-<<<<<<< HEAD
-=======
-                
->>>>>>> 7e4412b (Add Load Status warning, adopt Prod qty_confirm overwrite, lock Preview short-con)
                 <li><span class="field-chip">isinactive</span> บน Plan Load Detail</li>
                 <li><span class="field-chip">isclosed</span> บน TO line</li>
                 <li>Heavy Container</li>
