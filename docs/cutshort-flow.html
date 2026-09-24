@@ -180,6 +180,7 @@
     <a href="#case-container">Container-level</a>
     <a href="#reliability">Reliability</a>
     <a href="#precision">Decimal Precision</a>
+    <a href="#loadstatus">Load Status</a>
     <a href="#reference">Field Reference</a>
   </nav>
 
@@ -410,7 +411,11 @@
           </tbody>
         </table>
       </div>
+<<<<<<< HEAD
       <div class="callout warn"><strong>อัปเดต 2026-09-07 (issue #1):</strong> <span class="field-chip">custrecord_item_info_qty_confirm</span> บน Plan Load Detail — เดิม<strong>ห้ามเขียนทับเด็ดขาด</strong>ทุกเคส ตอนนี้เปลี่ยนแล้ว: เขียนทับด้วย <code>effectiveQty</code> เฉพาะเคส <strong>Qty-level</strong> เท่านั้น (Line-level/Container-level ยังคงห้ามแตะเหมือนเดิม) ยอดแผนดั้งเดิมจริงย้ายไปเก็บที่ <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> แทน — ยอมรับความเสี่ยงว่า Regenerate Wave/TO (Cancel + Confirm ใหม่) ของแถวที่เคย Qty-level short จะได้ยอดที่ short แล้วเป็นฐาน ไม่ใช่ยอดแผนเดิม</div>
+=======
+      <div class="callout warn"><strong>กฎ qty_confirm (แก้ไข 2026-09-24):</strong> Qty-level short <strong>เขียนทับ</strong> <span class="field-chip">custrecord_item_info_qty_confirm</span> ด้วยยอดใหม่ เพราะเอกสาร Container List ดึงค่านี้ไปแสดง — ยอดแผนดั้งเดิมถูกเก็บไว้ที่ <span class="field-chip">custrecord_item_info_short_qty_old</span> (stamp ครั้งแรกก่อนเขียนทับ) ส่วน Line/Container-level ไม่เขียนทับ</div>
+>>>>>>> 7e4412b (Add Load Status warning, adopt Prod qty_confirm overwrite, lock Preview short-con)
     </section>
 
     <!-- ============ CASE DETAILS ============ -->
@@ -431,8 +436,12 @@
               <h4>เขียนอะไร</h4>
               <ul>
                 <li>SA line: <span class="field-chip">quantity</span>, <span class="field-chip">custcol_shortshipment_qty_old</span> (ครั้งแรกที่เปลี่ยน), reason</li>
+<<<<<<< HEAD
                 <li>Plan Load Detail: <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> (ใหม่), reason</li>
                 <li>Plan Load Detail: <span class="field-chip field-new">custrecord_item_info_qty_confirm</span> = <code>effectiveQty</code> (Phase A = Wave Quantity, Phase B = Qty Shipped) — <strong>อัปเดต 2026-09-07 / issue #1</strong>, เดิมห้ามเขียนทับ ดูหมายเหตุความเสี่ยงด้านล่าง</li>
+=======
+                <li>Plan Load Detail: <span class="field-chip field-new">custrecord_item_info_short_qty_old</span> (ใหม่), reason, <span class="field-chip">custrecord_item_info_qty_confirm</span> = ยอดใหม่ (ใช้แสดงใน Container List)</li>
+>>>>>>> 7e4412b (Add Load Status warning, adopt Prod qty_confirm overwrite, lock Preview short-con)
                 <li>TO line: <span class="field-chip">quantity</span>, <span class="field-chip">custcol_shortshipment_qty_old</span>, reason</li>
                 <li>Wave: reason (+ conv/NW/GW ถ้าติ๊ก "Do not Cal Conv" — ของเดิม ไม่เปลี่ยน)</li>
               </ul>
@@ -440,6 +449,10 @@
             <div>
               <h4>ไม่แตะอะไร</h4>
               <ul>
+<<<<<<< HEAD
+=======
+                
+>>>>>>> 7e4412b (Add Load Status warning, adopt Prod qty_confirm overwrite, lock Preview short-con)
                 <li><span class="field-chip">isinactive</span> บน Plan Load Detail</li>
                 <li><span class="field-chip">isclosed</span> บน TO line</li>
                 <li>Heavy Container</li>
@@ -571,6 +584,23 @@
         <strong>บั๊กที่เจอจริง (2026-09-06):</strong> ปัดเศษด้วย <code>value.toFixed(3)</code> ตรงๆ ไม่เสถียร — ค่าเดียวกันทางคณิตศาสตร์ให้ผลต่างกันได้ตามที่มาของตัวเลข เช่น <span class="field-chip">9.8235</span> (พิมพ์ตรงๆ) → <code>toFixed(3)</code> ได้ <strong>9.823</strong> (ปัดผิด) แต่ <span class="field-chip">10.4784 − 0.6549</span> (ผลลบ ค่าเท่ากัน) → <code>toFixed(3)</code> ได้ <strong>9.824</strong> (ถูก) — เกิดจาก floating-point ของ JavaScript เก็บทศนิยมไม่เป๊ะที่ตำแหน่งพอดี 5 แล้ว "ปัดสุ่ม" ไปคนละทาง ยืนยันจากผู้ใช้ว่าเจอเคสแบบนี้เป็นปกติ (conversion factor ลงตัวสวยๆ เจอ .xxx5 บ่อย) ไม่ใช่ edge case หายาก
       </div>
       <p class="section-note" style="margin-top:14px;">แก้ด้วยฟังก์ชัน <span class="field-chip">roundHalfUp(value, 3)</span> (reparse ผ่าน exponential notation แทนการคูณ/ปัดตรงๆ) ใส่ทั้ง SL และ CS แทนที่ <code>toFixed(3)</code> ทุกจุดที่ใช้คำนวณยอดจริงไปเขียน SA — ทดสอบแล้วให้ผล <strong>9.824</strong> เสมอไม่ว่าที่มาของตัวเลขจะเป็นค่าดิบหรือผลลบ</p>
+    </section>
+
+    <!-- ============ LOAD STATUS ============ -->
+    <section id="loadstatus">
+      <div class="kicker">07b — Warning</div>
+      <h2>Load Status — เตือนก่อน Short</h2>
+      <p class="section-note">เพิ่ม 2026-09-24 หลังพบว่า user เผลอ Short ตู้ที่ยังไม่ได้ Load จริง (ยังไม่มี IF และ Warehouse ยังไม่ได้ปรับ Wave Qty) — เป็นการ<strong>เตือนอย่างเดียว</strong> ไม่เปลี่ยนการคำนวณ Short</p>
+      <div class="cards">
+        <div class="card"><span class="tag phaseB">มี IF แล้ว</span><h3>เทียบ Qty Shipped (IF)</h3><dl><dt>= แผน</dt><dd>Fully Loaded (เขียว)</dd><dt>≠ แผน</dt><dd>Short (แดง)</dd></dl></div>
+        <div class="card"><span class="tag phaseA">ยังไม่มี IF</span><h3>เทียบ Wave Qty</h3><dl><dt>= แผน</dt><dd>⚠ Not Loaded (ส้ม, ระบายทั้งแถว)</dd><dt>≠ แผน</dt><dd>Short (แดง)</dd></dl></div>
+      </div>
+      <ul class="section-note" style="margin-top:14px;">
+        <li>ยอดแผน = <span class="field-chip">short_qty_old</span> ถ้าเคย Short แล้ว ไม่งั้น <span class="field-chip">qty_confirm</span> — เทียบที่ 3 ตำแหน่ง (roundHalfUp)</li>
+        <li>แสดง 3 ชั้น: ป้ายในช่อง "Sel / Load Status" ของแถว Plan Load, ป้าย "⚠ N ตู้ยังไม่ Load" ที่แถว Item, แถบเตือนรวมเหนือตาราง — ทั้งหน้า Select Data และ Preview</li>
+        <li>กด Next Preview: ถ้ามีแถว Not Loaded ถูกติ๊ก → <code>confirm()</code> ครั้งเดียว แสดงรายการ Container + Item (OK = ไปต่อ, Cancel = อยู่หน้าเดิม) แถว Short ไม่เตือน</li>
+        <li>หน้า Preview: เช็คบ็อกซ์ "Short whole container" disable เสมอ — Start Process ใช้ข้อมูลจากหน้า Select Data ต้องการเปลี่ยนให้กด Back</li>
+      </ul>
     </section>
 
     <!-- ============ FIELD REFERENCE ============ -->

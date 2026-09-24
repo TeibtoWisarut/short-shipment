@@ -60,33 +60,6 @@ function roundHalfUp(value, d) {
 	return Number(Math.round(Number(n + 'e' + d)) + 'e-' + d);
 }
 
-// Load Status of one Plan Load Detail row (warning only — never affects the short calculation).
-// Plan qty = short_qty_old if already stamped (qty_confirm is overwritten on Qty-level short,
-// because the Container List print form reads it), else qty_confirm. Compared at 3 decimals.
-//   IF exists (Qty Shipped (IF) non-blank): equal → 'FL' Fully Loaded, else 'SH' Short
-//   no IF: Wave Qty equal → 'NL' Not Loaded, else 'SH' Short
-function computeLoadStatus(qtyShipped, waveQty, planQty) {
-	var plan = parseFloat(planQty);
-	if (isNaN(plan)) return '';
-	var hasIF = (qtyShipped != null && String(qtyShipped).trim() !== '');
-	var actual = parseFloat(hasIF ? qtyShipped : waveQty);
-	if (isNaN(actual)) return '';
-	var same = roundHalfUp(actual, 3) === roundHalfUp(plan, 3);
-	if (hasIF) return same ? 'FL' : 'SH';
-	return same ? 'NL' : 'SH';
-}
-
-function loadStatusBadgeHtml(status) {
-	var map = {
-		NL: ['#f5a623', '#3d2a00', '⚠ Not Loaded'],
-		SH: ['#fdecea', '#c0392b', 'Short'],
-		FL: ['#e6f4ea', '#2e7d32', 'Fully Loaded'],
-	};
-	var m = map[status];
-	if (!m) return '';
-	return '<span class="pl-load-status" style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:9px;font-size:11px;font-weight:700;white-space:nowrap;background:' + m[0] + ';color:' + m[1] + ';">' + m[2] + '</span>';
-}
-
 // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 // @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 // ########## Main Suitelet Function
@@ -267,28 +240,6 @@ function OnRequest(context, request, response) {
 				if (!planLoadMap[plKey]) planLoadMap[plKey] = [];
 				planLoadMap[plKey].push(ss_pl[p]);
 			}
-		}
-
-		// ----- short_qty_old per Plan Load Detail (plan qty for Load Status — see computeLoadStatus)
-		var shortQtyOldById = {};
-		try {
-			var plIdsForOld = [];
-			for (var po = 0; po < ss_pl.length; po++) {
-				var poId = ss_pl[po].id || ss_pl[po].getValue('internalid');
-				if (poId) plIdsForOld.push(poId);
-			}
-			if (plIdsForOld.length > 0) {
-				search.create({
-					type: 'customrecord_exp_item_information_pl',
-					filters: [['internalid', 'anyof', plIdsForOld], 'AND', ['custrecord_item_info_short_qty_old', 'isnotempty', '']],
-					columns: [search.createColumn({name: 'custrecord_item_info_short_qty_old'})],
-				}).run().each(function (r) {
-					shortQtyOldById[String(r.id)] = r.getValue('custrecord_item_info_short_qty_old');
-					return true;
-				});
-			}
-		} catch (eOldMap) {
-			log.error({title: 'short_qty_old map fail', details: eOldMap.message || String(eOldMap)});
 		}
 
 		// ----- Lookup IF conv values via TO sublist + applyingTransaction join
@@ -661,7 +612,7 @@ function OnRequest(context, request, response) {
                             <td colspan="11"><table class="pl-inner">
                             <thead>
                                 <tr>
-                                <th style="width:24px;">Sel / Load Status</th>
+                                <th style="width:24px;">Sel</th>
                                 <th>Plan Load</th>
                                 <th>Short whole container</th>
                                 <th>Container Index</th>
@@ -774,14 +725,9 @@ function OnRequest(context, request, response) {
 							var roStyle = convNotCalFlag ? '' : 'background:#f5f5f5;color:#666;';
 							var convInputStyle = 'width:80px;text-align:right;' + roStyle;
 
-							var oldQty = shortQtyOldById[String(plRecId || '')];
-							var planQtyForStatus = (oldQty != null && String(oldQty).trim() !== '') ? oldQty : qtyConfirm;
-							var loadStatus = computeLoadStatus(qtyShipped, waveQuantity, planQtyForStatus);
-							var plRowStyle = (loadStatus === 'NL') ? ' style="background:#fff3e0;"' : '';
-
 							// ===== LEVEL 3: Plan/Load row (deepest, no further nesting) =====
-							html += `<tr class="pl-row"${plRowStyle} data-load-status="${loadStatus}" data-plan-qty="${escHtml(planQtyForStatus == null ? '' : planQtyForStatus)}" data-said="${escHtml(saId_o)}" data-lineid="${escHtml(lineId)}" data-pl-id="${escHtml(plRecId)}" data-qs="${escHtml(qtyShipped == null ? '' : qtyShipped)}" data-wq="${escHtml(waveQuantity == null ? '' : waveQuantity)}" data-qc="${escHtml(qtyConfirm == null ? '' : qtyConfirm)}" data-inactive="${inactiveFlag ? 'T' : 'F'}" data-short-con="${shortConFlag ? 'T' : 'F'}" data-conv-not-cal-default="${convNotCalFlag ? 'T' : 'F'}" data-con-index="${escHtml(conIndex == null ? '' : conIndex)}" data-con-size="${escHtml(conSize == null ? '' : conSize)}">
-                                <td style="white-space:nowrap;"><input type="checkbox" class="pl-sel">${loadStatusBadgeHtml(loadStatus)}</td>
+							html += `<tr class="pl-row" data-said="${escHtml(saId_o)}" data-lineid="${escHtml(lineId)}" data-pl-id="${escHtml(plRecId)}" data-qs="${escHtml(qtyShipped == null ? '' : qtyShipped)}" data-wq="${escHtml(waveQuantity == null ? '' : waveQuantity)}" data-qc="${escHtml(qtyConfirm == null ? '' : qtyConfirm)}" data-inactive="${inactiveFlag ? 'T' : 'F'}" data-short-con="${shortConFlag ? 'T' : 'F'}" data-conv-not-cal-default="${convNotCalFlag ? 'T' : 'F'}" data-con-index="${escHtml(conIndex == null ? '' : conIndex)}" data-con-size="${escHtml(conSize == null ? '' : conSize)}">
+                                <td><input type="checkbox" class="pl-sel"></td>
                                 <td>${escHtml(planLoadTxt)}</td><td style="text-align:center;"><input type="checkbox" class="pl-short-con"${shortConFlag ? ' checked' : ''} disabled></td>
                                 <td>${escHtml(conIndex)}</td>
                                 <td>${escHtml(conSize)}</td>
@@ -978,7 +924,7 @@ function OnRequest(context, request, response) {
 						// Container Index, Container Size, Containers Number1, Qty (Plan Load), Conv.of Unit (PAL),
 						// Conv.of Unit (Roll), TO #, Wave #, Qty Shipped, Unit, Do not Cal Conv,
 						// Conv.of Unit (PAL) [from IF], Conv.of Unit (Roll) [from IF], Net Weight, Gross Weight, Inactive
-						html2 += `<tr class="item-children"><td colspan="4"><table class="pl-inner"><thead><tr><th style="width:180px;">Status</th><th style="width:24px;">Sel / Load Status</th>
+						html2 += `<tr class="item-children"><td colspan="4"><table class="pl-inner"><thead><tr><th style="width:180px;">Status</th><th style="width:24px;">Sel</th>
                         <th>Plan Load</th>
                         <th>Short whole container</th>
                         <th>Container Index</th>
@@ -1005,9 +951,7 @@ function OnRequest(context, request, response) {
 							var isInactiveT = (p.inactive === 'Yes' || p.inactive === 'T' || p.inactive === true || p.inactive === 'true');
 							var isShortConT = (p.shortCon === true || p.shortCon === 'T' || p.shortCon === 'true' || p.shortCon === 1);
 							// ===== LEVEL 3: Plan/Load row (deepest, no further nesting) =====
-							var pLoadStatus = p.loadStatus || '';
-							if (pLoadStatus === 'NL') rowStyle = p.selected ? ' style="background:#fff3e0;"' : ' style="opacity:0.55;background:#fff3e0;"';
-							html2 += `<tr class="pl-row"${rowStyle} data-load-status="${escHtml2(pLoadStatus)}" data-said="${escHtml2(it.said)}" data-lineid="${escHtml2(it.saLineId)}" data-plid="${escHtml2(p.planLoadId == null ? '' : p.planLoadId)}" data-selected="${p.selected ? 'T' : 'F'}" data-qs="${escHtml2(p.qtyShipped == null ? '' : p.qtyShipped)}" data-qc="${escHtml2(p.qtyConfirm == null ? '' : p.qtyConfirm)}" data-inactive="${isInactiveT ? 'T' : 'F'}" data-short-con="${isShortConT ? 'T' : 'F'}" data-con-index="${escHtml2(p.conIndex == null ? '' : p.conIndex)}" data-con-size="${escHtml2(p.conSize == null ? '' : p.conSize)}"><td><span class="pl-proc-img" data-plid="${escHtml2(p.planLoadId == null ? '' : p.planLoadId)}">${p.selected ? '⏳' : '—'}</span><span class="pl-proc-state" data-plid="${escHtml2(p.planLoadId == null ? '' : p.planLoadId)}">${p.selected ? 'Idle' : 'Skipped'}</span></td><td style="text-align:center;font-weight:700;white-space:nowrap;color:${p.selected ? '#2e7d32' : '#aaa'};">${selMark}${loadStatusBadgeHtml(pLoadStatus)}</td><td>${escHtml2(p.planLoad)}</td><td style="text-align:center;"><input type="checkbox" class="pl-short-con"${isShortConT ? ' checked' : ''} disabled></td><td>${escHtml2(p.conIndex)}</td><td>${escHtml2(p.conSize)}</td><td>${escHtml2(p.conName1)}</td><td>${escHtml2(p.qtyConfirm)}</td><td>${escHtml2(p.convPal)}</td><td>${escHtml2(p.convRoll)}</td><td>${escHtml2(p.toText)}</td><td>${escHtml2(p.waveNo)}</td><td>${escHtml2(p.waveQty)}</td><td>${escHtml2(p.qtyShipped)}</td><td>${escHtml2(p.uom)}</td><td style="text-align:center;"><input type="checkbox"${p.convNotCal ? ' checked' : ''} disabled></td><td>${escHtml2(p.convPalIF)}</td><td>${escHtml2(p.convRollIF)}</td><td>${escHtml2(p.netWeight)}</td><td>${escHtml2(p.grossWeight)}</td><td>${escHtml2(p.inactive)}</td></tr>`;
+							html2 += `<tr class="pl-row"${rowStyle} data-said="${escHtml2(it.said)}" data-lineid="${escHtml2(it.saLineId)}" data-plid="${escHtml2(p.planLoadId == null ? '' : p.planLoadId)}" data-selected="${p.selected ? 'T' : 'F'}" data-qs="${escHtml2(p.qtyShipped == null ? '' : p.qtyShipped)}" data-qc="${escHtml2(p.qtyConfirm == null ? '' : p.qtyConfirm)}" data-inactive="${isInactiveT ? 'T' : 'F'}" data-short-con="${isShortConT ? 'T' : 'F'}" data-con-index="${escHtml2(p.conIndex == null ? '' : p.conIndex)}" data-con-size="${escHtml2(p.conSize == null ? '' : p.conSize)}"><td><span class="pl-proc-img" data-plid="${escHtml2(p.planLoadId == null ? '' : p.planLoadId)}">${p.selected ? '⏳' : '—'}</span><span class="pl-proc-state" data-plid="${escHtml2(p.planLoadId == null ? '' : p.planLoadId)}">${p.selected ? 'Idle' : 'Skipped'}</span></td><td style="text-align:center;font-weight:700;color:${p.selected ? '#2e7d32' : '#aaa'};">${selMark}</td><td>${escHtml2(p.planLoad)}</td><td style="text-align:center;"><input type="checkbox" class="pl-short-con"${isShortConT ? ' checked' : ''}${p.selected ? '' : ' disabled'}></td><td>${escHtml2(p.conIndex)}</td><td>${escHtml2(p.conSize)}</td><td>${escHtml2(p.conName1)}</td><td>${escHtml2(p.qtyConfirm)}</td><td>${escHtml2(p.convPal)}</td><td>${escHtml2(p.convRoll)}</td><td>${escHtml2(p.toText)}</td><td>${escHtml2(p.waveNo)}</td><td>${escHtml2(p.waveQty)}</td><td>${escHtml2(p.qtyShipped)}</td><td>${escHtml2(p.uom)}</td><td style="text-align:center;"><input type="checkbox"${p.convNotCal ? ' checked' : ''} disabled></td><td>${escHtml2(p.convPalIF)}</td><td>${escHtml2(p.convRollIF)}</td><td>${escHtml2(p.netWeight)}</td><td>${escHtml2(p.grossWeight)}</td><td>${escHtml2(p.inactive)}</td></tr>`;
 						}
 						html2 += '</tbody></table></td></tr>';
 					}

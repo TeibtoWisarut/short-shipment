@@ -96,40 +96,10 @@ define(MODULE,
  *
  * @since 2015.2
  */
-// Item-row badge ("⚠ N ตู้ยังไม่ Load") + one banner above the grid, both computed from the
-// server-rendered data-load-status on pl-rows. Works on Select Data and Preview pages.
-function renderLoadStatusSummaries() {
-	var isSelectPage = jQuery('.item-sel').length > 0;
-	var saCounts = {};
-	var total = 0;
-	jQuery('tr.item-row').each(function () {
-		var $row = jQuery(this);
-		var said = $row.attr('data-said');
-		var lineid = $row.attr('data-lineid');
-		var n = jQuery('tr.pl-row[data-said="' + said + '"][data-lineid="' + lineid + '"][data-load-status="NL"]').length;
-		if (n === 0) return;
-		total += n;
-		saCounts[said] = (saCounts[said] || 0) + n;
-		$row.find('td').eq(isSelectPage ? 1 : 0).append(
-			'<span class="item-load-warn" style="margin-left:8px;padding:1px 8px;border-radius:9px;background:#f5a623;color:#3d2a00;font-size:11px;font-weight:700;white-space:nowrap;">⚠ ' + n + ' ตู้ยังไม่ Load</span>');
-	});
-	if (total === 0) return;
-	var parts = [];
-	for (var sd in saCounts) {
-		var docNum = jQuery.trim(jQuery('tr.sa-row[data-said="' + sd + '"]').find('td').eq(2).text()) || sd;
-		parts.push(docNum + ' (' + saCounts[sd] + ' แถว)');
-	}
-	jQuery('div.so-wrap').first().before(
-		'<div class="so-load-warn" style="color:#3d2a00;font-weight:700;font-size:15px;background:#fff3e0;border:2px solid #f5a623;padding:10px 14px;margin:6px 0 12px 0;">⚠ มี ' + total
-		+ ' แถวที่ยัง Not Loaded (ยังไม่มี IF และ Wave Qty ยังเท่ากับแผน) — ระวังก่อน Short: ' + parts.join(', ') + '</div>');
-}
-
 function PageInit(scriptContext, currentRecord, mode) {
 	currentRecord = scriptContext.currentRecord;
 	mode = scriptContext.mode;
 	cRecord = currentRecord;
-
-	try { renderLoadStatusSummaries(); } catch (eLs) { console.error('Load Status summary error:', eLs); }
 
 	// ----- Bind handlers on the custom nested-table grid (rendered via inlinehtml)
 	try {
@@ -542,25 +512,6 @@ function SaveRecord(scriptContext) {
 		return false;
 	}
 
-	// ----- Warn (one confirm for all rows): selected rows still Not Loaded (no IF, Wave Qty = plan)
-	try {
-		var notLoaded = [];
-		jQuery('tr.pl-row[data-load-status="NL"]').each(function () {
-			var $pl = jQuery(this);
-			if (!$pl.find('.pl-sel').is(':checked')) return;
-			var said = $pl.attr('data-said');
-			var lineid = $pl.attr('data-lineid');
-			var $itemRow = jQuery('tr.item-row[data-said="' + said + '"][data-lineid="' + lineid + '"]');
-			var itemTxt = jQuery.trim($itemRow.find('td').eq(1).clone().find('.item-load-warn').remove().end().text());
-			notLoaded.push('• Container ' + ($pl.attr('data-con-index') || '?') + ' — ' + itemTxt);
-		});
-		if (notLoaded.length > 0) {
-			var nlMsg = 'มี ' + notLoaded.length + ' แถวที่เลือกไว้ยังไม่ได้ Load (ยังไม่มี IF และ Wave Qty ยังเท่ากับแผน):\n\n'
-				+ notLoaded.join('\n') + '\n\nยืนยันจะ Short ต่อหรือไม่?';
-			if (!window.confirm(nlMsg)) return false;
-		}
-	} catch (eNl) { console.error('Not Loaded check error:', eNl); }
-
 	// ----- Build payload: ONLY selected items + ONLY selected plan/loads
 	//        + group container breakdown by SA from SELECTED pl-rows
 	try {
@@ -577,7 +528,7 @@ function SaveRecord(scriptContext) {
 			var $reasonSel = $row.find('.item-reason');
 			var reasonId = $reasonSel.val();
 			var reasonText = $reasonSel.find('option:selected').text();
-			var itemText = jQuery.trim($row.find('td').eq(1).clone().find('.item-load-warn').remove().end().text());
+			var itemText = jQuery.trim($row.find('td').eq(1).text());
 			var saQty = jQuery.trim($row.find('td').eq(2).text());
 			// Take displayed page-2 values directly (do NOT recompute on preview)
 			var pageTotalQtyShippedDisp = jQuery.trim($row.find('td').eq(3).text());     // Qty Shipped on item-row (already excludes inactive)
@@ -595,7 +546,6 @@ function SaveRecord(scriptContext) {
 				if (isSelected) anySelected = true;
 				planLoads.push({
 					selected: isSelected,
-					loadStatus: $pl.attr('data-load-status') || '',
 					planLoadId: $pl.attr('data-pl-id') || '',
 					waveLineId: $pl.find('.col-wave-line').data('wave-line') != null ? String($pl.find('.col-wave-line').data('wave-line')) : '',
 					toId: $pl.find('.col-to-id').data('to-id') != null ? String($pl.find('.col-to-id').data('to-id')) : '',

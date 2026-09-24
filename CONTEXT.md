@@ -42,9 +42,10 @@ _ที่มา: ยืนยันโดยผู้ใช้ 2026-09-04 — �
 1 ตู้ container = 1 TO = 1 Wave เสมอ (ความสัมพันธ์ตายตัว ไม่มี TO/Wave ไหนครอบคลุมหลายตู้ หรือตู้เดียวกระจายหลาย TO/Wave) **แต่ 1 ตู้มีได้หลาย item พร้อมกัน** — ดังนั้น TO/Wave 1 ใบ มีได้หลาย line/detail record ข้างใน (1 ต่อ 1 item)
 
 **Qty Confirm** (`custrecord_item_info_qty_confirm` บน Plan Load):
+
 ปริมาณ "ตามแผน" (order intent) — stamp มาตั้งแต่ PI → SA → Plan Load ตอนสร้าง Plan Load เลย เดิมไม่เกี่ยวข้องกับ Wave หรือการสแกนใดๆ เลย
 
-**อัปเดต 2026-09-07 (issue #1)**: เคส **Qty-level** เท่านั้น `Script - SL Update Qty Cut Short.js` จะเขียนทับ field นี้ด้วย `effectiveQty` (Phase A = Wave Quantity, Phase B = Qty Shipped) หลังจากนี้ field นี้จึงไม่ใช่ยอดแผนดั้งเดิมที่คงที่ตลอดไปอีกต่อไปสำหรับแถวที่เคยถูก Qty-level short — ยอดแผนดั้งเดิมจริงต้องไปดูที่ `custrecord_item_info_short_qty_old` แทน (ดู "Qty Old preservation fields" ด้านล่าง) **ความเสี่ยงที่ยอมรับแล้ว**: flow Cancel Wave + Confirm ใหม่ (Wave regeneration) ที่เคยใช้ field นี้เป็นต้นทาง จะได้ยอดที่ short ไปแล้วแทนยอดแผนเดิม หากมีคน regenerate wave หลังจากแถวนั้นถูก Qty-level short ไปแล้ว — Line-level/Container-level (ค่า=0) ไม่ถูกแตะ ยังคงพฤติกรรมเดิม
+**อัปเดต 2026-09-07 (issue #1)**: เคส **Qty-level** เท่านั้น `Script - SL Update Qty Cut Short.js` จะเขียนทับ field นี้ด้วย `effectiveQty` (Phase A = Wave Quantity, Phase B = Qty Shipped) หลังจากนี้ field นี้จึงไม่ใช่ยอดแผนดั้งเดิมที่คงที่ตลอดไปอีกต่อไปสำหรับแถวที่เคยถูก Qty-level short — ยอดแผนดั้งเดิมจริงต้องไปดูที่ `custrecord_item_info_short_qty_old` แทน (ดู "Qty Old preservation fields" ด้านล่าง) **ความเสี่ยงที่ยอมรับแล้ว**: flow Cancel Wave + Confirm ใหม่ (Wave regeneration) ที่เคยใช้ field นี้เป็นต้นทาง จะได้ยอดที่ short ไปแล้วแทนยอดแผนเดิม หากมีคน regenerate wave หลังจากแถวนั้นถูก Qty-level short ไปแล้ว — Line-level/Container-level (ค่า=0) ไม่ถูกแตะ ยังคงพฤติกรรมเดิม — เหตุผลที่เขียนทับ: เอกสาร Container List ดึงค่านี้ไปแสดง
 
 **Wave Quantity** (`custrecord_twms_wavei_wavequantity` บน Wave):
 ปริมาณเป้าหมายที่ใช้อ้างอิงตอน Scan Packed / Scan Shipped — ถูก copy ค่ามาจาก Qty Confirm ของ Plan Load ตอน Wave ถูก auto-generate (trigger จากการกด "Confirm" บน Plan Load ซึ่งสร้าง TO + Wave พร้อมกัน)
@@ -77,3 +78,9 @@ Record แยกต่างหาก 1 แถวต่อ 1 container (ไม�
 - Plan Load Item Detail: `custrecord_item_info_short_qty_old` (field ใหม่ กำลังสร้าง 2026-09-05)
 
 **SA Item-line rollup**: ไม่ใช่กลไกแยก แต่เป็นมุมมองสรุป — 1 SA item-line (1 item) อาจกระจายไปหลาย container ผ่านหลาย Detail row; ยอดที่โชว์บน SA line คือผลรวมของ Detail row ทั้งหมดของ item นั้นข้ามทุก container (แต่ละแถวจะเป็น Qty/Line/Container-level อะไรก็ได้ผสมกันได้)
+
+**Load Status** (สถานะการ Load ของ 1 Plan Load Detail row — ใช้เตือนผู้ใช้ก่อน Short ไม่ใช่ตัวตัดสินระดับ Short):
+เทียบ "ยอดจริง" กับ "ยอดแผน" (`Qty (Plan Load)`) ที่ความละเอียด 3 ตำแหน่ง:
+- มี IF แล้ว → ยอดจริง = Qty Shipped (IF): เท่าแผน = **Fully Loaded**, ไม่เท่า = **Short**
+- ยังไม่มี IF → ยอดจริง = Wave Qty: เท่าแผน = **Not Loaded** (ของยังไม่ถูกยืนยันว่า Load จริง — ต้องระวังก่อน Short), ไม่เท่า = **Short** (เช่น Warehouse ปรับ Wave แล้วจาก Gram Swing)
+_Avoid_: "Loaded" เฉยๆ — ไม่มีสถานะ "Scan แล้วแต่ยังไม่ Gen IF" แยก
