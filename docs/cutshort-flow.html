@@ -580,8 +580,8 @@
       <h2>Load Status — เตือนก่อน Short</h2>
       <p class="section-note">เพิ่ม 2026-09-24 หลังพบว่า user เผลอ Short ตู้ที่ยังไม่ได้ Load จริง (ยังไม่มี IF และ Warehouse ยังไม่ได้ปรับ Wave Qty) — เป็นการ<strong>เตือนอย่างเดียว</strong> ไม่เปลี่ยนการคำนวณ Short</p>
       <div class="cards">
-        <div class="card"><span class="tag phaseB">มี IF แล้ว</span><h3>เทียบ Qty Shipped (IF)</h3><dl><dt>= แผน</dt><dd>Fully Loaded (เขียว)</dd><dt>≠ แผน</dt><dd>Short (แดง)</dd></dl></div>
-        <div class="card"><span class="tag phaseA">ยังไม่มี IF</span><h3>เทียบ Wave Qty</h3><dl><dt>= แผน</dt><dd>⚠ Not Loaded (ส้ม, ระบายทั้งแถว)</dd><dt>≠ แผน</dt><dd>Short (แดง)</dd></dl></div>
+        <div class="card"><span class="tag phaseB">มี IF แล้ว</span><h3>เทียบ Qty Shipped (IF)</h3><dl><dt>≥ แผน</dt><dd>Fully Loaded (เขียว)</dd><dt>&lt; แผน</dt><dd>Short (แดง)</dd></dl></div>
+        <div class="card"><span class="tag phaseA">ยังไม่มี IF</span><h3>เทียบ Wave Qty</h3><dl><dt>≥ แผน</dt><dd>⚠ Not Loaded (ส้ม, ระบายทั้งแถว)</dd><dt>&lt; แผน</dt><dd>Short (แดง)</dd></dl></div>
       </div>
       <ul class="section-note" style="margin-top:14px;">
         <li>ยอดแผน = <span class="field-chip">short_qty_old</span> ถ้าเคย Short แล้ว ไม่งั้น <span class="field-chip">qty_confirm</span> — เทียบที่ 3 ตำแหน่ง (roundHalfUp)</li>

@@ -63,17 +63,17 @@ function roundHalfUp(value, d) {
 // Load Status of one Plan Load Detail row (warning only — never affects the short calculation).
 // Plan qty = short_qty_old if already stamped (qty_confirm is overwritten on Qty-level short,
 // because the Container List print form reads it), else qty_confirm. Compared at 3 decimals.
-//   IF exists (Qty Shipped (IF) non-blank): equal → 'FL' Fully Loaded, else 'SH' Short
-//   no IF: Wave Qty equal → 'NL' Not Loaded, else 'SH' Short
+// Short = actual BELOW plan only; at or above plan is not a shortage:
+//   IF exists (Qty Shipped (IF) non-blank): below → 'SH' Short, else 'FL' Fully Loaded
+//   no IF: Wave Qty below → 'SH' Short, else 'NL' Not Loaded
 function computeLoadStatus(qtyShipped, waveQty, planQty) {
 	var plan = parseFloat(planQty);
 	if (isNaN(plan)) return '';
 	var hasIF = (qtyShipped != null && String(qtyShipped).trim() !== '');
 	var actual = parseFloat(hasIF ? qtyShipped : waveQty);
 	if (isNaN(actual)) return '';
-	var same = roundHalfUp(actual, 3) === roundHalfUp(plan, 3);
-	if (hasIF) return same ? 'FL' : 'SH';
-	return same ? 'NL' : 'SH';
+	if (roundHalfUp(actual, 3) < roundHalfUp(plan, 3)) return 'SH';
+	return hasIF ? 'FL' : 'NL';
 }
 
 function loadStatusBadgeHtml(status) {
@@ -471,6 +471,7 @@ function OnRequest(context, request, response) {
 }
 .item-inner tr.item-row:nth-child(even) > td{background:#f4f8fc;}
 .item-inner tr.item-children > td{background:#fafbfd;padding:5px 8px 5px 20px;}
+.pl-inner tr.pl-row[data-load-status="NL"] > td{background:#fff3e0 !important;}
 .pl-inner{width:auto;min-width:100%;}
 .pl-inner thead th{
 	background:#8db4d9;color:#fff;font-weight:500;text-align:left;
@@ -881,6 +882,7 @@ function OnRequest(context, request, response) {
 .item-inner{width:auto;min-width:100%;}
 .item-inner thead th{background:#4f81bd;color:#fff;font-weight:500;text-align:left;}
 .item-inner tr.item-children > td{background:#fafbfd;padding:5px 8px 5px 20px;}
+.pl-inner tr.pl-row[data-load-status="NL"] > td{background:#fff3e0 !important;}
 .pl-inner{width:auto;min-width:100%;}
 .pl-inner thead th{background:#8db4d9;color:#fff;font-weight:500;text-align:left;}
 .proc-img{display:inline-block;min-width:20px;text-align:center;}

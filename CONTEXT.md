@@ -80,7 +80,7 @@ Record แยกต่างหาก 1 แถวต่อ 1 container (ไม�
 **SA Item-line rollup**: ไม่ใช่กลไกแยก แต่เป็นมุมมองสรุป — 1 SA item-line (1 item) อาจกระจายไปหลาย container ผ่านหลาย Detail row; ยอดที่โชว์บน SA line คือผลรวมของ Detail row ทั้งหมดของ item นั้นข้ามทุก container (แต่ละแถวจะเป็น Qty/Line/Container-level อะไรก็ได้ผสมกันได้)
 
 **Load Status** (สถานะการ Load ของ 1 Plan Load Detail row — ใช้เตือนผู้ใช้ก่อน Short ไม่ใช่ตัวตัดสินระดับ Short):
-เทียบ "ยอดจริง" กับ "ยอดแผน" (`Qty (Plan Load)`) ที่ความละเอียด 3 ตำแหน่ง:
-- มี IF แล้ว → ยอดจริง = Qty Shipped (IF): เท่าแผน = **Fully Loaded**, ไม่เท่า = **Short**
-- ยังไม่มี IF → ยอดจริง = Wave Qty: เท่าแผน = **Not Loaded** (ของยังไม่ถูกยืนยันว่า Load จริง — ต้องระวังก่อน Short), ไม่เท่า = **Short** (เช่น Warehouse ปรับ Wave แล้วจาก Gram Swing)
+เทียบ "ยอดจริง" กับ "ยอดแผน" (Short Qty Old ถ้าเคย Short แล้ว ไม่งั้น Qty Confirm) ที่ความละเอียด 3 ตำแหน่ง — **Short = ยอดจริงต่ำกว่าแผนเท่านั้น** ยอดเท่าหรือเกินแผนไม่ถือว่า Short:
+- มี IF แล้ว → ยอดจริง = Qty Shipped (IF): ต่ำกว่าแผน = **Short**, เท่าหรือเกิน = **Fully Loaded**
+- ยังไม่มี IF → ยอดจริง = Wave Qty: ต่ำกว่าแผน = **Short** (เช่น Warehouse ปรับ Wave ลงแล้วจาก Gram Swing), เท่าหรือเกิน = **Not Loaded** (ยังไม่ยืนยันว่า Load จริง — ต้องระวังก่อน Short)
 _Avoid_: "Loaded" เฉยๆ — ไม่มีสถานะ "Scan แล้วแต่ยังไม่ Gen IF" แยก
