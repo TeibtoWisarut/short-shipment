@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Short Shipment Process</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&family=Noto+Serif:ital@0;1&family=Noto+Sans+KR:wght@400;500;600&family=Noto+Serif+KR:wght@400&family=Noto+Sans+TC:wght@400;500;600&family=Noto+Serif+TC:wght@400&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f5;
+      --color-ink:     #2d3142;
+      --color-muted:   #4f5d75;
+      --color-accent:  #eb6c36;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', 'Noto Serif', 'Noto Serif KR', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1000px; width: 100%; margin: 0 auto; }
+    .eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.66rem;
+      font-weight: 500;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      color: var(--color-ink);
+      margin-bottom: 0.5rem;
+    }
+    .subtitle {
+      font-family: var(--font-sans);
+      font-size: 0.9rem;
+      color: var(--color-muted);
+      margin-bottom: 1.25rem;
+      max-width: 72ch;
+    }
+    .hint {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--color-muted);
+      margin-bottom: 0.5rem;
+    }
+    svg { width: 100%; min-width: 700px; display: block; }
+    .diagram-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      margin: 1rem 0 0.6rem;
+    }
+    .zoom-btn {
+      width: 26px;
+      height: 26px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      border: 1px solid rgba(45,49,66,0.20);
+      border-radius: 4px;
+      color: var(--color-muted);
+      cursor: pointer;
+      padding: 0;
+    }
+    .zoom-btn:hover { border-color: rgba(45,49,66,0.40); color: var(--color-ink); }
+    .zoom-btn:focus { outline: 2px solid #eb6c36; outline-offset: 1px; }
+    .zoom-btn svg { width: 14px; height: 14px; min-width: 0; display: block; }
+    .zoom-level {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      color: var(--color-muted);
+      min-width: 3.2em;
+      text-align: center;
+    }
+    .zoom-reset {
+      font-family: var(--font-mono);
+      font-size: 0.62rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      width: auto;
+      padding: 0 0.5rem;
+    }
+    .diagram-scroll {
+      overflow: auto;
+      cursor: grab;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+    .diagram-scroll::-webkit-scrollbar { display: none; }
+    .diagram-scroll.is-dragging { cursor: grabbing; }
+    .diagram-scroll.is-dragging svg { pointer-events: none; }
+    .step-chip { cursor: pointer; }
+    .step-chip:focus { outline: 2px solid #eb6c36; outline-offset: 1px; }
+    .step-node, .step-chip { transition: opacity 0.15s ease; }
+    .step-node.is-dimmed, .step-chip.is-dimmed { opacity: 0.22; }
+    .cards {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr 0.9fr;
+      gap: 1rem;
+      margin-top: 1.75rem;
+    }
+    @media (max-width: 800px) { .cards { grid-template-columns: 1fr; } }
+    .card {
+      background: #ffffff;
+      border: 1px solid rgba(45,49,66,0.12);
+      border-radius: 6px;
+      padding: 1.25rem;
+    }
+    .card .eyebrow { margin-bottom: 0.75rem; }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .card-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .card-dot.ink    { background: var(--color-ink); }
+    .card-dot.muted  { background: var(--color-muted); }
+    .card-dot.coral  { background: var(--color-accent); }
+    .card h3 { font-size: 0.95rem; font-weight: 600; }
+    .card ul { list-style: none; }
+    .card li {
+      font-size: 0.82rem;
+      color: var(--color-muted);
+      padding: 0.2rem 0;
+      border-bottom: 1px dashed rgba(45,49,66,0.10);
+    }
+    .card li:last-child { border-bottom: none; }
+    .card li b { color: var(--color-ink); font-weight: 600; }
+    footer {
+      margin-top: 2.5rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(45,49,66,0.12);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--color-muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Process &middot; O2C &middot; Short Shipment</p>
+    <h1>Short Shipment &mdash; Update Qty Cut Short</h1>
+    <p class="subtitle">&#3648;&#3588;&#3619;&#3639;&#3656;&#3629;&#3591;&#3617;&#3639;&#3629;&#3611;&#3619;&#3633;&#3610;&#3611;&#3619;&#3640;&#3591;&#3592;&#3635;&#3609;&#3623;&#3609;&#3626;&#3636;&#3609;&#3588;&#3657;&#3634;&#3607;&#3637;&#3656;&#3586;&#3634;&#3604;&#3626;&#3656;&#3591; (short shipment) &#3610;&#3609; Shipping Advice &#3649;&#3621;&#3657;&#3623; cascade &#3621;&#3591;&#3652;&#3611;&#3617;&#3634;&#3623;&#3599;&#3639;&#3656;&#3609; &#3648;&#3585;&#3636;&#3604;&#3652;&#3604;&#3657;&#3607;&#3633;&#3657;&#3591; <b>Phase A</b> (&#3585;&#3656;&#3629;&#3609; Gen IF &#3619;&#3606;&#3618;&#3633;&#3591;&#3652;&#3617;&#3656;&#3629;&#3629;&#3585;&#3592;&#3634;&#3585;&#3650;&#3619;&#3591;&#3591;&#3634;&#3609;) &#3649;&#3621;&#3632; <b>Phase B</b> (&#3627;&#3621;&#3633;&#3591;&#3619;&#3606;&#3629;&#3629;&#3585;&#3649;&#3621;&#3657;&#3623; &#3617;&#3637;&#3611;&#3633;&#3597;&#3627;&#3634;&#3619;&#3632;&#3627;&#3623;&#3656;&#3634;&#3591;&#3607;&#3634;&#3591;) &#3592;&#3640;&#3604; focal &#3588;&#3639;&#3629; step &#3607;&#3637;&#3656; &quot;Start Process&quot; &#3648;&#3614;&#3619;&#3634;&#3632;&#3648;&#3611;&#3655;&#3609;&#3592;&#3640;&#3604;&#3607;&#3637;&#3656; cascade &#3648;&#3586;&#3637;&#3618;&#3609;&#3621;&#3591; 5 record &#3614;&#3619;&#3657;&#3629;&#3617;&#3585;&#3633;&#3609;&#3592;&#3619;&#3636;&#3591;</p>
+    <p class="hint">&#3588;&#3621;&#3636;&#3585;&#3629;&#3585;&#3630;&#3639;&#3629;&#3605;&#3633;&#3623;&#3648;&#3621;&#3586;&#3586;&#3633;&#3657;&#3609;&#3605;&#3629;&#3609;&#3648;&#3614;&#3639;&#3656;&#3629;&#3652;&#3628;&#3609; &middot; &#3626;&#3639;&#3656;&#3629;&#3586;&#3618;&#3634;&#3618; +/- &#3648;&#3614;&#3639;&#3656;&#3629;&#3595;&#3641;&#3617; &#3649;&#3621;&#3657;&#3623;&#3588;&#3621;&#3636;&#3585;&#3621;&#3634;&#3585;&#3610;&#3609;&#3604;&#3636;&#3634;&#3649;&#3585;&#3619;&#3617;&#3648;&#3614;&#3639;&#3656;&#3629;&#3648;&#3621;&#3639;&#3656;&#3629;&#3609;&#3604;&#3641;</p>
+
+    <div class="diagram-toolbar">
+      <button type="button" class="zoom-btn" data-zoom="out" data-target="diagram-shortship" aria-label="Zoom out"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><line x1="9.7" y1="9.7" x2="14" y2="14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="4.3" y1="6.5" x2="8.7" y2="6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+      <span class="zoom-level" data-level-for="diagram-shortship">100%</span>
+      <button type="button" class="zoom-btn" data-zoom="in" data-target="diagram-shortship" aria-label="Zoom in"><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke="currentColor" stroke-width="1.4"/><line x1="9.7" y1="9.7" x2="14" y2="14" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><line x1="4.3" y1="6.5" x2="8.7" y2="6.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><line x1="6.5" y1="4.3" x2="6.5" y2="8.7" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg></button>
+      <button type="button" class="zoom-btn zoom-reset" data-zoom="reset" data-target="diagram-shortship" aria-label="Reset zoom">Reset</button>
+    </div>
+    <div class="diagram-scroll">
+    <svg id="diagram-shortship" viewBox="0 0 952 364" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="shortship-title shortship-desc">
+      <title id="shortship-title">Short Shipment Process - Update Qty Cut Short</title>
+      <desc id="shortship-desc">Process diagram showing the Short Shipment correction flow across Warehouse/Cockpit, Order Handling, and an automated System role: from detecting a shipped-quantity shortfall, through filtering, selecting, and previewing the affected Shipping Advice rows, to the focal cascade update that rewrites the Shipping Advice, Plan Load, Transfer Order, Wave, and Item Fulfillment records, optionally inactivating the container record, ending with the Shipping Advice reflecting the true shipped quantity.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#4f5d75"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#eb6c36"/></marker>
+      </defs>
+        <rect width="952" height="364" fill="#f5f5f5"/>
+        <rect x="140" y="36" width="812" height="80" fill="rgba(45,49,66,0.018)"/>
+        <rect x="140" y="196" width="812" height="80" fill="rgba(45,49,66,0.018)"/>
+        <line x1="0" y1="36" x2="952" y2="36" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <line x1="0" y1="116" x2="952" y2="116" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <line x1="0" y1="196" x2="952" y2="196" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <line x1="0" y1="276" x2="952" y2="276" stroke="rgba(45,49,66,0.12)" stroke-width="0.8"/>
+        <line x1="140" y1="36" x2="140" y2="276" stroke="rgba(45,49,66,0.20)" stroke-width="1"/>
+        <g class="step-chip" data-step="1" tabindex="0" role="button" aria-label="Highlight step 1: DETECT">
+        <rect x="190.0" y="8" width="16" height="16" rx="8" fill="rgba(45,49,66,0.12)"/>
+        <text x="198" y="19" fill="#2d3142" font-size="8" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">1</text>
+        <text x="198" y="32" fill="#4f5d75" font-size="6" font-weight="500" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">DETECT</text>
+        </g>
+        <g class="step-chip" data-step="2" tabindex="0" role="button" aria-label="Highlight step 2: FILTER">
+        <rect x="302.0" y="8" width="16" height="16" rx="8" fill="rgba(45,49,66,0.12)"/>
+        <text x="310" y="19" fill="#2d3142" font-size="8" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">2</text>
+        <text x="310" y="32" fill="#4f5d75" font-size="6" font-weight="500" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">FILTER</text>
+        </g>
+        <g class="step-chip" data-step="3" tabindex="0" role="button" aria-label="Highlight step 3: SELECT">
+        <rect x="414.0" y="8" width="16" height="16" rx="8" fill="rgba(45,49,66,0.12)"/>
+        <text x="422" y="19" fill="#2d3142" font-size="8" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">3</text>
+        <text x="422" y="32" fill="#4f5d75" font-size="6" font-weight="500" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">SELECT</text>
+        </g>
+        <g class="step-chip" data-step="4" tabindex="0" role="button" aria-label="Highlight step 4: PREVIEW">
+        <rect x="526.0" y="8" width="16" height="16" rx="8" fill="rgba(45,49,66,0.12)"/>
+        <text x="534" y="19" fill="#2d3142" font-size="8" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">4</text>
+        <text x="534" y="32" fill="#4f5d75" font-size="6" font-weight="500" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">PREVIEW</text>
+        </g>
+        <g class="step-chip" data-step="5" tabindex="0" role="button" aria-label="Highlight step 5: PROCESS">
+        <rect x="638.0" y="8" width="16" height="16" rx="8" fill="rgba(235,108,54,0.20)"/>
+        <text x="646" y="19" fill="#eb6c36" font-size="8" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">5</text>
+        <text x="646" y="32" fill="#eb6c36" font-size="6" font-weight="500" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">PROCESS</text>
+        </g>
+        <g class="step-chip" data-step="6" tabindex="0" role="button" aria-label="Highlight step 6: HVY CONT">
+        <rect x="750.0" y="8" width="16" height="16" rx="8" fill="rgba(45,49,66,0.12)"/>
+        <text x="758" y="19" fill="#2d3142" font-size="8" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">6</text>
+        <text x="758" y="32" fill="#4f5d75" font-size="6" font-weight="500" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">HVY CONT</text>
+        </g>
+        <g class="step-chip" data-step="7" tabindex="0" role="button" aria-label="Highlight step 7: RESULT">
+        <rect x="862.0" y="8" width="16" height="16" rx="8" fill="rgba(45,49,66,0.12)"/>
+        <text x="870" y="19" fill="#2d3142" font-size="8" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">7</text>
+        <text x="870" y="32" fill="#4f5d75" font-size="6" font-weight="500" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.12em">RESULT</text>
+        </g>
+        <text x="70.0" y="72.0" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">WAREHOUSE</text>
+        <text x="70.0" y="84.0" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">/ COCKPIT</text>
+        <text x="70.0" y="152.0" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ORDER</text>
+        <text x="70.0" y="164.0" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">HANDLING</text>
+        <text x="70.0" y="232.0" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SYSTEM</text>
+        <text x="70.0" y="244.0" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">(AUTO)</text>
+        <path d="M 248.0,76.0 H 302.0 Q 310.0,76.0 310.0,84.0 V 124.0" fill="none" stroke="#4f5d75" stroke-width="1.0" marker-end="url(#arrow)"/>
+        <line x1="360.0" y1="156.0" x2="372.0" y2="156.0" stroke="#4f5d75" stroke-width="1.0" marker-end="url(#arrow)"/>
+        <line x1="472.0" y1="156.0" x2="484.0" y2="156.0" stroke="#4f5d75" stroke-width="1.0" marker-end="url(#arrow)"/>
+        <path d="M 584.0,156.0 H 638.0 Q 646.0,156.0 646.0,164.0 V 204.0" fill="none" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+        <line x1="696.0" y1="236.0" x2="708.0" y2="236.0" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+        <path d="M 808.0,236.0 H 862.0 Q 870.0,236.0 870.0,228.0 V 188.0" fill="none" stroke="#4f5d75" stroke-width="1.0" marker-end="url(#arrow)"/>
+        <g class="step-node" data-step="1">
+        <rect x="148.0" y="44.0" width="100" height="64" rx="6" fill="#f5f5f5"/>
+        <rect x="148.0" y="44.0" width="100" height="64" rx="6" fill="#ffffff" stroke="rgba(45,49,66,0.25)" stroke-width="1"/>
+        <rect x="152.0" y="48.0" width="14" height="10" rx="2" fill="rgba(45,49,66,0.10)"/>
+        <text x="159.0" y="56.0" fill="#4f5d75" font-size="6" font-weight="700" font-family="'Geist Mono', monospace" text-anchor="middle">WH</text>
+        <text x="198" y="70.0" fill="#2d3142" font-size="9" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Short Detected</text>
+        <text x="198" y="84.0" fill="#4f5d75" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">Wave qty mismatch</text>
+        <text x="198" y="96.0" fill="#7a8399" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">Phase A (pre-IF)</text>
+        </g>
+        <g class="step-node" data-step="2">
+        <rect x="260.0" y="124.0" width="100" height="64" rx="6" fill="#f5f5f5"/>
+        <rect x="260.0" y="124.0" width="100" height="64" rx="6" fill="#ffffff" stroke="rgba(45,49,66,0.25)" stroke-width="1"/>
+        <rect x="264.0" y="128.0" width="14" height="10" rx="2" fill="rgba(45,49,66,0.10)"/>
+        <text x="271.0" y="136.0" fill="#4f5d75" font-size="6" font-weight="700" font-family="'Geist Mono', monospace" text-anchor="middle">OH</text>
+        <text x="310" y="150.0" fill="#2d3142" font-size="9" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Filter Shipping Adv.</text>
+        <text x="310" y="164.0" fill="#4f5d75" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">SA → filtered list</text>
+        <text x="310" y="176.0" fill="#7a8399" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">Update Qty Cut Short SL</text>
+        </g>
+        <g class="step-node" data-step="3">
+        <rect x="372.0" y="124.0" width="100" height="64" rx="6" fill="#f5f5f5"/>
+        <rect x="372.0" y="124.0" width="100" height="64" rx="6" fill="#ffffff" stroke="rgba(45,49,66,0.25)" stroke-width="1"/>
+        <rect x="376.0" y="128.0" width="14" height="10" rx="2" fill="rgba(45,49,66,0.10)"/>
+        <text x="383.0" y="136.0" fill="#4f5d75" font-size="6" font-weight="700" font-family="'Geist Mono', monospace" text-anchor="middle">OH</text>
+        <text x="422" y="150.0" fill="#2d3142" font-size="9" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Select &amp; Set Reason</text>
+        <text x="422" y="164.0" fill="#4f5d75" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">Pick SA/Item/PL rows</text>
+        <text x="422" y="176.0" fill="#7a8399" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">Reason dropdown</text>
+        </g>
+        <g class="step-node" data-step="4">
+        <rect x="484.0" y="124.0" width="100" height="64" rx="6" fill="#f5f5f5"/>
+        <rect x="484.0" y="124.0" width="100" height="64" rx="6" fill="#ffffff" stroke="rgba(45,49,66,0.25)" stroke-width="1"/>
+        <rect x="488.0" y="128.0" width="14" height="10" rx="2" fill="rgba(45,49,66,0.10)"/>
+        <text x="495.0" y="136.0" fill="#4f5d75" font-size="6" font-weight="700" font-family="'Geist Mono', monospace" text-anchor="middle">OH</text>
+        <text x="534" y="150.0" fill="#2d3142" font-size="9" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Preview &amp; Confirm</text>
+        <text x="534" y="164.0" fill="#4f5d75" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">Review totals</text>
+        <text x="534" y="176.0" fill="#7a8399" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">Preview page</text>
+        </g>
+        <g class="step-node" data-step="5">
+        <rect x="596.0" y="204.0" width="100" height="64" rx="6" fill="#f5f5f5"/>
+        <rect x="596.0" y="204.0" width="100" height="64" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1.2"/>
+        <rect x="600.0" y="208.0" width="14" height="10" rx="2" fill="rgba(235,108,54,0.18)"/>
+        <text x="607.0" y="216.0" fill="#eb6c36" font-size="6" font-weight="700" font-family="'Geist Mono', monospace" text-anchor="middle">SYS</text>
+        <text x="646" y="230.0" fill="#2d3142" font-size="9" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Start Process</text>
+        <text x="646" y="244.0" fill="#4f5d75" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">SA+PL+TO+Wave+IF cascade</text>
+        <text x="646" y="256.0" fill="#7a8399" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">process_pl (retry ×3)</text>
+        </g>
+        <g class="step-node" data-step="6">
+        <rect x="708.0" y="204.0" width="100" height="64" rx="6" fill="#f5f5f5"/>
+        <rect x="708.0" y="204.0" width="100" height="64" rx="6" fill="#ffffff" stroke="rgba(45,49,66,0.25)" stroke-width="1"/>
+        <rect x="712.0" y="208.0" width="14" height="10" rx="2" fill="rgba(45,49,66,0.10)"/>
+        <text x="719.0" y="216.0" fill="#4f5d75" font-size="6" font-weight="700" font-family="'Geist Mono', monospace" text-anchor="middle">SYS</text>
+        <text x="758" y="230.0" fill="#2d3142" font-size="9" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Inactivate Container</text>
+        <text x="758" y="244.0" fill="#4f5d75" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">Container-level only</text>
+        <text x="758" y="256.0" fill="#7a8399" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">Heavy Container</text>
+        </g>
+        <g class="step-node" data-step="7">
+        <rect x="820.0" y="124.0" width="100" height="64" rx="6" fill="#f5f5f5"/>
+        <rect x="820.0" y="124.0" width="100" height="64" rx="6" fill="#ffffff" stroke="rgba(45,49,66,0.25)" stroke-width="1"/>
+        <rect x="824.0" y="128.0" width="14" height="10" rx="2" fill="rgba(45,49,66,0.10)"/>
+        <text x="831.0" y="136.0" fill="#4f5d75" font-size="6" font-weight="700" font-family="'Geist Mono', monospace" text-anchor="middle">OH</text>
+        <text x="870" y="150.0" fill="#2d3142" font-size="9" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">SA Reflects True Qty</text>
+        <text x="870" y="164.0" fill="#4f5d75" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">Ready for customs</text>
+        <text x="870" y="176.0" fill="#7a8399" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="middle">Qty Old preserved</text>
+        </g>
+        <text x="144" y="292" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.10em">STEPS</text>
+        <g class="step-chip" data-step="1" tabindex="0" role="button" aria-label="Highlight step 1: DETECT">
+        <rect x="210" y="281" width="16" height="14" rx="7" fill="rgba(45,49,66,0.12)"/>
+        <text x="218" y="290.5" fill="#2d3142" font-size="7" font-weight="600" font-family='"Geist Mono", monospace' text-anchor="middle">1</text>
+        </g>
+        <g class="step-chip" data-step="2" tabindex="0" role="button" aria-label="Highlight step 2: FILTER">
+        <rect x="234" y="281" width="16" height="14" rx="7" fill="rgba(45,49,66,0.12)"/>
+        <text x="242" y="290.5" fill="#2d3142" font-size="7" font-weight="600" font-family='"Geist Mono", monospace' text-anchor="middle">2</text>
+        </g>
+        <g class="step-chip" data-step="3" tabindex="0" role="button" aria-label="Highlight step 3: SELECT">
+        <rect x="258" y="281" width="16" height="14" rx="7" fill="rgba(45,49,66,0.12)"/>
+        <text x="266" y="290.5" fill="#2d3142" font-size="7" font-weight="600" font-family='"Geist Mono", monospace' text-anchor="middle">3</text>
+        </g>
+        <g class="step-chip" data-step="4" tabindex="0" role="button" aria-label="Highlight step 4: PREVIEW">
+        <rect x="282" y="281" width="16" height="14" rx="7" fill="rgba(45,49,66,0.12)"/>
+        <text x="290" y="290.5" fill="#2d3142" font-size="7" font-weight="600" font-family='"Geist Mono", monospace' text-anchor="middle">4</text>
+        </g>
+        <g class="step-chip" data-step="5" tabindex="0" role="button" aria-label="Highlight step 5: PROCESS">
+        <rect x="306" y="281" width="16" height="14" rx="7" fill="rgba(235,108,54,0.20)"/>
+        <text x="314" y="290.5" fill="#eb6c36" font-size="7" font-weight="600" font-family='"Geist Mono", monospace' text-anchor="middle">5</text>
+        </g>
+        <g class="step-chip" data-step="6" tabindex="0" role="button" aria-label="Highlight step 6: HVY CONT">
+        <rect x="330" y="281" width="16" height="14" rx="7" fill="rgba(45,49,66,0.12)"/>
+        <text x="338" y="290.5" fill="#2d3142" font-size="7" font-weight="600" font-family='"Geist Mono", monospace' text-anchor="middle">6</text>
+        </g>
+        <g class="step-chip" data-step="7" tabindex="0" role="button" aria-label="Highlight step 7: RESULT">
+        <rect x="354" y="281" width="16" height="14" rx="7" fill="rgba(45,49,66,0.12)"/>
+        <text x="362" y="290.5" fill="#2d3142" font-size="7" font-weight="600" font-family='"Geist Mono", monospace' text-anchor="middle">7</text>
+        </g>
+        <text x="144" y="355" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.10em">FLOW</text>
+        <line x1="230" y1="351" x2="258" y2="351" stroke="#4f5d75" stroke-width="1" marker-end="url(#arrow)"/>
+        <text x="264" y="355" fill="#4f5d75" font-size="6.5" font-family="'Geist Mono', monospace">Standard handoff</text>
+        <line x1="420" y1="351" x2="448" y2="351" stroke="#eb6c36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+        <text x="454" y="355" fill="#4f5d75" font-size="6.5" font-family="'Geist Mono', monospace">Focal step (Start Process)</text>
+    </svg>
+    </div>
+
+    <div class="cards">
+      <div class="card">
+        <p class="eyebrow">3 &#3619;&#3632;&#3604;&#3633;&#3610;&#3586;&#3629;&#3591; SHORT</p>
+        <div class="card-header"><span class="card-dot coral"></span><h3>Qty / Line / Container</h3></div>
+        <ul>
+          <li><b>Qty-level:</b> &#3621;&#3604;&#3610;&#3634;&#3591;&#3626;&#3656;&#3623;&#3609;&#3651;&#3609; 1 &#3649;&#3606;&#3623; &#3652;&#3617;&#3656;&#3606;&#3638;&#3591; 0</li>
+          <li><b>Line-level:</b> 1 item &#3651;&#3609;&#3605;&#3641;&#3657;&#3609;&#3633;&#3657;&#3609; = 0 &#3607;&#3633;&#3657;&#3591;&#3627;&#3617;&#3604; (&#3651;&#3610; Short &#3607;&#3633;&#3657;&#3591;&#3649;&#3606;&#3623;)</li>
+          <li><b>Container-level:</b> &#3607;&#3640;&#3585; item &#3651;&#3609;&#3605;&#3641;&#3657;&#3609;&#3633;&#3657;&#3609; = 0 &#3614;&#3619;&#3657;&#3629;&#3617;&#3585;&#3633;&#3609; &#3624;;&#3605;&#3636;&#3585; Heavy Container</li>
+        </ul>
+      </div>
+      <div class="card">
+        <p class="eyebrow">PHASE A vs PHASE B</p>
+        <div class="card-header"><span class="card-dot muted"></span><h3>&#3652;&#3617;&#3656; Exclusive &#3585;&#3633;&#3609;</h3></div>
+        <ul>
+          <li><b>Phase A</b> (&#3585;&#3656;&#3629;&#3609; Gen IF): &#3629;&#3656;&#3634;&#3609;&#3588;&#3656;&#3634;&#3592;&#3634;&#3585; Wave Quantity</li>
+          <li><b>Phase B</b> (&#3627;&#3621;&#3633;&#3591; Gen IF): &#3629;&#3656;&#3634;&#3609;&#3588;&#3656;&#3634;&#3592;&#3634;&#3585; Qty Shipped</li>
+          <li>Container &#3648;&#3604;&#3637;&#3618;&#3623; Short &#3652;&#3604;&#3657;&#3607;&#3633;&#3657;&#3591; 2 Phase &#3588;&#3609;&#3621;&#3632;&#3619;&#3629;&#3610;</li>
+        </ul>
+      </div>
+      <div class="card">
+        <p class="eyebrow">FOCAL STEP</p>
+        <div class="card-header"><span class="card-dot ink"></span><h3>Start Process (step 5)</h3></div>
+        <ul>
+          <li>&#3648;&#3586;&#3637;&#3618;&#3609; 5 record: SA, Plan Load, TO, Wave, IF/IR</li>
+          <li>Retry 3 &#3588;&#3619;&#3633;&#3657;&#3591;&#3648;&#3617;&#3639;&#3656;&#3629;&#3648;&#3592;&#3629; RCRD_HAS_BEEN_CHANGED</li>
+          <li>Qty Old &#3611;&#3619;&#3632;&#3648;&#3607;&#3624;&#3649;&#3619;&#3585;&#3607;&#3637;&#3656; Short &#3648;&#3585;&#3636;&#3604; &#3652;&#3617;&#3656;&#3648;&#3586;&#3637;&#3618;&#3609;&#3607;&#3633;&#3610;&#3595;&#3635;</li>
+        </ul>
+      </div>
+    </div>
+
+    <footer>Short Shipment Process &middot; Update Qty Cut Short &middot; v1 &middot; &#3619;&#3656;&#3634;&#3591;&#3592;&#3634;&#3585; ShortShipment/CONTEXT.md + PLAN-cutshort-redesign.md &#3649;&#3621;&#3632; Script - SL Update Qty Cut Short.js &mdash; &#3619;&#3629;&#3605;&#3619;&#3623;&#3592;&#3626;&#3629;&#3610;&#3588;&#3623;&#3634;&#3617;&#3606;&#3641;&#3585;&#3605;&#3657;&#3629;&#3591;&#3585;&#3633;&#3610;&#3607;&#3637;&#3617; Export</footer>
+  </div>
+
+  <script>
+    (function () {
+      var active = null;
+      function apply() {
+        document.querySelectorAll('.step-node, .step-chip').forEach(function (el) {
+          var match = active === null || el.getAttribute('data-step') === active;
+          el.classList.toggle('is-dimmed', !match);
+        });
+      }
+      function toggleStep(step) {
+        active = active === step ? null : step;
+        apply();
+      }
+      var suppressNextClick = false;
+      document.addEventListener('click', function (evt) {
+        if (suppressNextClick) { suppressNextClick = false; return; }
+        var chip = evt.target.closest('.step-chip');
+        if (chip) toggleStep(chip.getAttribute('data-step'));
+      });
+      document.addEventListener('keydown', function (evt) {
+        if (evt.key !== 'Enter' && evt.key !== ' ') return;
+        var chip = evt.target.closest && evt.target.closest('.step-chip');
+        if (chip) { evt.preventDefault(); toggleStep(chip.getAttribute('data-step')); }
+      });
+
+      var ZOOM_MIN = 0.6, ZOOM_MAX = 2.4, ZOOM_STEP = 0.2;
+      var zoomLevels = {};
+      function baseWidth(svg) {
+        var vb = svg.viewBox && svg.viewBox.baseVal;
+        return (vb && vb.width) || svg.clientWidth || 952;
+      }
+      function setZoom(target, level) {
+        var svg = document.getElementById(target);
+        if (!svg) return;
+        level = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Math.round(level * 100) / 100));
+        zoomLevels[target] = level;
+        svg.style.width = (baseWidth(svg) * level) + 'px';
+        var label = document.querySelector('[data-level-for="' + target + '"]');
+        if (label) label.textContent = Math.round(level * 100) + '%';
+      }
+      document.addEventListener('click', function (evt) {
+        var btn = evt.target.closest('.zoom-btn');
+        if (!btn) return;
+        var target = btn.getAttribute('data-target');
+        var action = btn.getAttribute('data-zoom');
+        var current = zoomLevels[target] || 1;
+        if (action === 'in') setZoom(target, current + ZOOM_STEP);
+        else if (action === 'out') setZoom(target, current - ZOOM_STEP);
+        else setZoom(target, 1);
+      });
+
+      var DRAG_THRESHOLD = 4;
+      document.querySelectorAll('.diagram-scroll').forEach(function (scroller) {
+        var dragging = false, startX = 0, startY = 0, startLeft = 0, startTop = 0, moved = false;
+        scroller.addEventListener('pointerdown', function (evt) {
+          if (evt.button !== undefined && evt.button !== 0) return;
+          dragging = true;
+          moved = false;
+          startX = evt.clientX;
+          startY = evt.clientY;
+          startLeft = scroller.scrollLeft;
+          startTop = scroller.scrollTop;
+        });
+        scroller.addEventListener('pointermove', function (evt) {
+          if (!dragging) return;
+          var dx = evt.clientX - startX;
+          var dy = evt.clientY - startY;
+          if (!moved && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) {
+            moved = true;
+            // Only now does this become a real drag — engaging pointer-events:none / capture
+            // any earlier would steal the click's hit-test target on a plain tap (see endDrag).
+            scroller.classList.add('is-dragging');
+            scroller.setPointerCapture(evt.pointerId);
+          }
+          if (!moved) return;
+          scroller.scrollLeft = startLeft - dx;
+          scroller.scrollTop = startTop - dy;
+        });
+        function endDrag() {
+          if (!dragging) return;
+          dragging = false;
+          scroller.classList.remove('is-dragging');
+          if (moved) suppressNextClick = true;
+        }
+        scroller.addEventListener('pointerup', endDrag);
+        scroller.addEventListener('pointercancel', endDrag);
+        scroller.addEventListener('pointerleave', function () { if (dragging) endDrag(); });
+      });
+    })();
+  </script>
+</body>
+</html>
