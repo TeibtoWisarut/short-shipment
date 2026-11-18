@@ -19,7 +19,7 @@ var PAGETITLE = 'Short Order Update';
 // SA (Shipping Advice) record type — adjust if SA is a custom transaction instead of salesorder
 var SA_RECORD_TYPE = 'salesorder';
 
-var config, format, record, redirect, runtime, search, serverWidget, url, query, libCode;
+var config, format, record, redirect, runtime, search, serverWidget, url, query, libCode, libSAShipStatus;
 var MODULE = [];
 MODULE.push('N/config');
 MODULE.push('N/format');
@@ -31,6 +31,7 @@ MODULE.push('N/ui/serverWidget');
 MODULE.push('N/url');
 MODULE.push('N/query');
 MODULE.push('SuiteScripts/Library/Libraries Code 2.0.220622.js');
+MODULE.push('SuiteScripts/Library/Lib - SA Shipment Status.js');
 
 var step = null;
 var timer = new Date().getTime();
@@ -76,6 +77,30 @@ function computeLoadStatus(qtyShipped, waveQty, planQty) {
 	return hasIF ? 'FL' : 'NL';
 }
 
+// "Enable Do not Cal on Short Function" on the item's Sub-Group — enables/disables the
+// "Do not Cal Conv" checkbox on this page (T = enabled, F = disabled). Lookup fails closed.
+function shortDncEnabledByItem(itemIds) {
+	var out = {};
+	var ids = [];
+	(itemIds || []).forEach(function (v) {
+		var n = parseInt(v, 10);
+		if (n > 0 && ids.indexOf(n) === -1) ids.push(n);
+	});
+	for (var s = 0; s < ids.length; s += 900) {
+		var chunk = ids.slice(s, s + 900);
+		try {
+			query.runSuiteQL({
+				query: 'SELECT i.id, sg.custrecord_item_subgrp_short_enable_dnc AS f FROM item i' +
+					' JOIN customrecord_cseg_item_sub_group sg ON sg.id = i.cseg_item_sub_group' +
+					' WHERE i.id IN (' + chunk.join(',') + ')',
+			}).asMappedResults().forEach(function (r) { out[String(r.id)] = (r.f === 'T' || r.f === true); });
+		} catch (e) {
+			log.error({title: 'Sub-Group short DNC lookup fail (treated as disabled)', details: e.message || String(e)});
+		}
+	}
+	return out;
+}
+
 function loadStatusBadgeHtml(status) {
 	var map = {
 		NL: ['#f5a623', '#3d2a00', '⚠ Not Loaded'],
@@ -105,8 +130,9 @@ define(MODULE,
 	 * @param {url} _url
 	 * @param {query} _query
 	 * @param {libCode_220622} _libCode
+	 * @param {Object} _libSAShipStatus
 	 */
-	function (_config, _format, _record, _redirect, _runtime, _search, _serverWidget, _url, _query, _libCode) {
+	function (_config, _format, _record, _redirect, _runtime, _search, _serverWidget, _url, _query, _libCode, _libSAShipStatus) {
 		config = _config;
 		format = _format;
 		record = _record;
@@ -117,6 +143,7 @@ define(MODULE,
 		url = _url;
 		query = _query;
 		libCode = _libCode;
+		libSAShipStatus = _libSAShipStatus;
 
 		return {
 			onRequest: OnRequest,
@@ -242,6 +269,12 @@ function OnRequest(context, request, response) {
 				if (!lineMap[saIdLine]) lineMap[saIdLine] = [];
 				lineMap[saIdLine].push(ss_sa_line[j]);
 			}
+		}
+
+		// ----- Sub-Group "Enable Do not Cal on Short Function" per item (enables/disables Do not Cal Conv)
+		var shortDncByItem = {};
+		if (!!ss_sa_line && ss_sa_line.length > 0) {
+			shortDncByItem = shortDncEnabledByItem(ss_sa_line.map(function (r) { return r.getValue('item'); }));
 		}
 
 		// ----- Load Plan/Load search filtered by SA list (3rd level)
@@ -611,6 +644,7 @@ function OnRequest(context, request, response) {
 					var itemWeightOfUnit = lines[k].getText({name: 'custitem_item_weight_of_unit', join: 'item'}) || lines[k].getValue({name: 'custitem_item_weight_of_unit', join: 'item'});
 					var itemStdNetWeight = lines[k].getValue({name: 'custitem_infor_std_net_weight', join: 'item'});
 					var itemGrossWeight = lines[k].getValue({name: 'custitem_infor_gross_weight', join: 'item'});
+					var itemShortDnc = shortDncByItem[String(lines[k].getValue('item'))] === true;
 
 					// Plan/Loads for this Item line
 					var planLoads = planLoadMap[saId_o + '|' + lineId] || [];
@@ -638,7 +672,7 @@ function OnRequest(context, request, response) {
 						: sumQtyShippedRounded.toFixed(3);
 
 					// ===== LEVEL 2: Item row =====
-					html += `<tr class="item-row" data-said="${escHtml(saId_o)}" data-lineid="${escHtml(lineId)}" data-sa-id="${escHtml(saLineInternalId)}" data-weight-of-unit="${escHtml(itemWeightOfUnit)}" data-std-net-weight="${escHtml(itemStdNetWeight)}" data-gross-weight="${escHtml(itemGrossWeight)}">
+					html += `<tr class="item-row" data-said="${escHtml(saId_o)}" data-lineid="${escHtml(lineId)}" data-sa-id="${escHtml(saLineInternalId)}" data-weight-of-unit="${escHtml(itemWeightOfUnit)}" data-std-net-weight="${escHtml(itemStdNetWeight)}" data-gross-weight="${escHtml(itemGrossWeight)}" data-short-dnc="${itemShortDnc ? 'T' : 'F'}">
                         <td><input type="checkbox" class="item-sel"></td>
                         <td>${escHtml(itemTxt)}</td>
                         <td>${escHtml(qtyVal)}</td><td class="item-qty-shipped">${escHtml(sumQtyShippedDisp)}</td>
@@ -797,7 +831,7 @@ function OnRequest(context, request, response) {
                                 <td>${escHtml(refFulfillTxt)}</td>
                                 <td>${escHtml(waveQuantity)}</td>
                                 <td>${escHtml(qtyShipped)}</td>
-                                <td>${escHtml(wavUomTxt)}</td><td style="text-align:center;"><input type="checkbox" class="pl-do-not-cal-conv"${convNotCalFlag ? ' checked' : ''} disabled></td>
+                                <td>${escHtml(wavUomTxt)}</td><td style="text-align:center;"><input type="checkbox" class="pl-do-not-cal-conv"${convNotCalFlag ? ' checked' : ''}${itemShortDnc ? '' : ' disabled'}></td>
                                 <td><input type="text" class="pl-conv-pal-if" value="${escHtml(convPalIF)}" style="${convInputStyle}" data-default="${escHtml(convPalIF)}"${roAttr}></td>
                                 <td><input type="text" class="pl-conv-roll-if" value="${escHtml(convRollIF)}" style="${convInputStyle}" data-default="${escHtml(convRollIF)}"${roAttr}></td>
                                 <td><input type="text" class="pl-net-weight" value="${escHtml(netWeight)}" style="${convInputStyle}" data-default="${escHtml(netWeight)}"${roAttr}></td>
@@ -1275,11 +1309,29 @@ function OnRequest(context, request, response) {
 						var toChanged = false;
 
 						// Qty Old preservation (custcol_shortshipment_qty_old) — stamp ONLY on first
-						// change (currently empty), mirroring the existing SA-line pattern.
+						// change (currently empty). Source = the Wave line's Order Quantity (the qty at
+						// order time, never edited), NOT the TO's current quantity: Warehouse often lowers
+						// TO qty by hand before Cut Short runs, so the TO no longer holds the original.
+						// Falls back to the TO's current quantity only if the Wave value is unavailable.
 						try {
 							var existingToOld = toRec.getSublistValue({sublistId: 'item', fieldId: 'custcol_shortshipment_qty_old', line: lineIdx});
 							if (existingToOld == null || String(existingToOld).trim() === '') {
-								var preChangeToQty = toRec.getSublistValue({sublistId: 'item', fieldId: 'quantity', line: lineIdx});
+								var preChangeToQty = null;
+								if (pl.waveLineId) {
+									try {
+										var waveOrderLookup = search.lookupFields({
+											type: 'customrecord_twms_wave_item',
+											id: pl.waveLineId,
+											columns: ['custrecord_twms_wavei_orderquantity'],
+										});
+										preChangeToQty = waveOrderLookup.custrecord_twms_wavei_orderquantity;
+									} catch (eWaveOq) {
+										log.error({title: 'TO qty_old wave orderquantity lookup fail', details: 'waveLine=' + pl.waveLineId + ' :: ' + (eWaveOq.message || String(eWaveOq))});
+									}
+								}
+								if (preChangeToQty == null || String(preChangeToQty).trim() === '') {
+									preChangeToQty = toRec.getSublistValue({sublistId: 'item', fieldId: 'quantity', line: lineIdx});
+								}
 								if (preChangeToQty != null && String(preChangeToQty).trim() !== '') {
 									toRec.setSublistValue({sublistId: 'item', fieldId: 'custcol_shortshipment_qty_old', line: lineIdx, value: preChangeToQty});
 									toChanged = true;
@@ -1294,13 +1346,46 @@ function OnRequest(context, request, response) {
 						// quantity=0 on a Transfer Order line ("must have a positive count", confirmed
 						// empirically) — for isZero rows the line must be CLOSED instead (below), never
 						// have its quantity touched at all; whatever value is already there becomes moot
-						// once the line is closed. Phase B must NEVER touch quantity regardless of
-						// isZero — the TO already finished its lifecycle via IF/IR, so lowering quantity
+						// once the line is closed. Phase B may only lower quantity down to the
+						// fulfilled/received floor (see below) and never closes the line — lowering
 						// below what was already fulfilled/received is rejected by NetSuite itself
 						// ("Transfer orders can not be overfulfilled or overreceived", confirmed live
 						// 2026-09-06 testing a Qty-level short on an already-fulfilled TO line).
 						if (!isZero && phaseAActive) {
 							if (setIfDiff(toRec, 'item', 'quantity', lineIdx, effectiveQty)) toChanged = true;
+						}
+						// Phase B (IF exists): also write the new quantity, but never below what is already
+						// fulfilled/received on the line (NetSuite rejects over-fulfilled/over-received).
+						// Only lowers quantity — never raises it, never closes the line.
+						// Guarded: any failure here (read or later save rejection) only skips the qty
+						// change — reason / qty_old / Plan Load / IF / IR still proceed normally.
+						var phaseBApplied = false;
+						var phaseBOrigQty = null;
+						var phaseBTargetQty = null;
+						if (!isZero && !phaseAActive) {
+							try {
+								var curToQty = parseFloat(toRec.getSublistValue({sublistId: 'item', fieldId: 'quantity', line: lineIdx})) || 0;
+								var fulfilledToQty = parseFloat(toRec.getSublistValue({sublistId: 'item', fieldId: 'quantityfulfilled', line: lineIdx})) || 0;
+								var receivedToQty = parseFloat(toRec.getSublistValue({sublistId: 'item', fieldId: 'quantityreceived', line: lineIdx})) || 0;
+								var phaseBQty = Math.max(effectiveQty, fulfilledToQty, receivedToQty);
+								if (phaseBQty > 0 && phaseBQty < curToQty) {
+									phaseBOrigQty = curToQty;
+									if (setIfDiff(toRec, 'item', 'quantity', lineIdx, phaseBQty)) {
+										toChanged = true;
+										phaseBApplied = true;
+										phaseBTargetQty = phaseBQty;
+									}
+									log.audit({title: 'TO qty Phase B: try', details: 'id=' + pl.toId + ' line=' + lineIdx + ' qty ' + curToQty + ' -> ' + phaseBQty + ' (eff=' + effectiveQty + ' ful=' + fulfilledToQty + ' rcv=' + receivedToQty + ')'});
+								} else {
+									log.audit({title: 'TO qty Phase B: skip', details: 'id=' + pl.toId + ' line=' + lineIdx + ' cur=' + curToQty + ' target=' + phaseBQty + ' (eff=' + effectiveQty + ' ful=' + fulfilledToQty + ' rcv=' + receivedToQty + ')'});
+								}
+							} catch (ePhaseB) {
+								if (phaseBOrigQty != null) {
+									try { toRec.setSublistValue({sublistId: 'item', fieldId: 'quantity', line: lineIdx, value: phaseBOrigQty}); } catch (eRv) { /* ignore */ }
+								}
+								phaseBApplied = false;
+								log.error({title: 'TO qty Phase B: set fail', details: 'id=' + pl.toId + ' line=' + lineIdx + ' :: ' + (ePhaseB.message || String(ePhaseB))});
+							}
 						}
 
 						// Line-level / Container-level (qty=0): close the TO line — Phase A ONLY, and
@@ -1324,7 +1409,18 @@ function OnRequest(context, request, response) {
 						if (toChanged) {
 							log.audit({title: 'usage: before TO save', details: 'id=' + pl.toId + ' remaining=' + runtime.getCurrentScript().getRemainingUsage()});
 							// TO: keep triggers (business logic relies on them) → standard save
-							toRec.save({ignoreMandatoryFields: true});
+							try {
+								toRec.save({ignoreMandatoryFields: true});
+								if (phaseBApplied) log.audit({title: 'TO qty Phase B: OK', details: 'id=' + pl.toId + ' line=' + lineIdx + ' qty ' + phaseBOrigQty + ' -> ' + phaseBTargetQty});
+							} catch (eSave) {
+								// Collision → let withRetryOnCollision reload & retry. Otherwise, if the
+								// Phase B qty change is the likely culprit, put qty back and save the rest.
+								if (!phaseBApplied || (eSave && eSave.name === 'RCRD_HAS_BEEN_CHANGED')) throw eSave;
+								log.error({title: 'TO qty Phase B: REJECTED', details: 'id=' + pl.toId + ' line=' + lineIdx + ' qty ' + phaseBOrigQty + ' -> ' + phaseBTargetQty + ' :: ' + (eSave.name || '') + ' ' + (eSave.message || String(eSave))});
+								toRec.setSublistValue({sublistId: 'item', fieldId: 'quantity', line: lineIdx, value: phaseBOrigQty});
+								phaseBApplied = false;
+								toRec.save({ignoreMandatoryFields: true});
+							}
 							log.audit({title: 'TO saved', details: 'id=' + pl.toId + ' line=' + lineIdx + ' reason=' + reason + ' qty=' + effectiveQty + ' closed=' + closedNow});
 							updated.push({type: 'TO', id: pl.toId, line: lineIdx, reason: reason, qty: effectiveQty, closed: closedNow});
 						}
@@ -1503,6 +1599,17 @@ function OnRequest(context, request, response) {
 				} catch (e) {
 					log.error({title: 'IR/IF lookup fail', details: 'TO=' + pl.toId + ' :: ' + (e.message || String(e))});
 					failed.push({type: 'IR/IF search', toId: pl.toId, msg: e.message || String(e)});
+				}
+
+				// ---- (c) SA Load Status: ตัด Short สำเร็จ = Final ทั้ง SA ทันที (ไม่เทียบ IR) + ล็อกไม่ให้
+				//         MR Auto Create IR Transfer recompute ทับ — ทำเฉพาะเมื่อ (a)/(b) ไม่มีอะไร fail
+				if (failed.length === 0) {
+					try {
+						log.audit({title: 'SA Load Status', details: JSON.stringify(libSAShipStatus.forceStampFinal(said))});
+					} catch (eCL) {
+						log.error({title: 'SA Load Status fail', details: 'said=' + said + ' :: ' + (eCL.message || String(eCL))});
+						failed.push({type: 'ContainerListStatus', id: said, msg: eCL.message || String(eCL)});
+					}
 				}
 
 				log.audit({

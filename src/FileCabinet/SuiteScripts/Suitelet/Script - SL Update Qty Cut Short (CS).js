@@ -152,7 +152,7 @@ function PageInit(scriptContext, currentRecord, mode) {
 				// Cascade: tick all Plan/Load checkboxes under this Item + enable short-con + enable Do not Cal Conv
 				$plChildren.find('.pl-sel').prop('checked', true);
 				$plChildren.find('.pl-short-con').prop('disabled', false);
-				$plChildren.find('.pl-do-not-cal-conv').prop('disabled', false);
+				$plChildren.find('tr.pl-row').each(function () { setDncBySetup(jQuery(this)); });
 			} else {
 				// If no sibling item is still checked, untick SA
 				var anyChecked = $siblings.filter(':checked').length > 0;
@@ -167,8 +167,8 @@ function PageInit(scriptContext, currentRecord, mode) {
 				// Disable Do not Cal Conv + reset 4 conv inputs to PL defaults on each pl-row of this item
 				$plChildren.find('tr.pl-row').each(function () {
 					var $plRow = jQuery(this);
-					$plRow.find('.pl-do-not-cal-conv').prop('disabled', true);
 					resetConvFromDefaults($plRow);
+					setDncBySetup($plRow);
 				});
 			}
 		});
@@ -198,6 +198,15 @@ function PageInit(scriptContext, currentRecord, mode) {
 				$i.val($i.attr('data-default') || '');
 			});
 			setConvInputsEditable($plRow, defaultConvNotCal);
+		}
+
+		// Enable/disable "Do not Cal Conv" straight from the item's Sub-Group setup "Enable Do not Cal
+		// on Short Function" (item-row data-short-dnc): T = enabled, F = disabled. Nothing else changes.
+		function setDncBySetup($plRow) {
+			var said = $plRow.attr('data-said');
+			var lineid = $plRow.attr('data-lineid');
+			var enabled = jQuery('tr.item-row[data-said="' + said + '"][data-lineid="' + lineid + '"]').attr('data-short-dnc') === 'T';
+			$plRow.find('.pl-do-not-cal-conv').prop('disabled', !enabled);
 		}
 
 		// Do not Cal Conv checkbox toggle -> cascade editability to 4 conv-related inputs.
@@ -275,12 +284,8 @@ function PageInit(scriptContext, currentRecord, mode) {
 			//   selected → enable checkbox (user may toggle override)
 			//   unselected → reset to PL default + disable + cascade 4 conv inputs back to defaults
 			var $convNotCal = $plRow.find('.pl-do-not-cal-conv');
-			if (this.checked) {
-				$convNotCal.prop('disabled', false);
-			} else {
-				$convNotCal.prop('disabled', true);
-				resetConvFromDefaults($plRow);
-			}
+			if (!this.checked) resetConvFromDefaults($plRow);
+			setDncBySetup($plRow);
 
 			if (this.checked) {
 				// CHECK: tick Item + SA (use .prop so item-sel handler isn't re-triggered → no down-cascade to siblings)
@@ -400,7 +405,7 @@ function PageInit(scriptContext, currentRecord, mode) {
 					// .pl-sel via .prop() above does not fire its change handler, so without this the
 					// checkbox stays disabled on every auto-selected sibling (only the row the user
 					// actually clicked gets it enabled by the real click's change event).
-					$sib.find('.pl-do-not-cal-conv').prop('disabled', false);
+					setDncBySetup($sib);
 				});
 			}
 
